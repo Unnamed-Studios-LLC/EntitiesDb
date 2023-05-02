@@ -238,7 +238,7 @@ void OnAdd(uint entityId, ref Component component) { }
 void OnRemove(uint entityId, ref Component component) { }
 
 // example code
-EntityDatabase entityDatabase
+EntityDatabase entityDatabase;
 
 // subscribe
 entityDatabase.Subscribe(Event.OnAdd, OnAdd);
