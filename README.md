@@ -16,18 +16,18 @@ Adding or Removing components must be done with **EntityLayout**.
 ```c#
 struct Position
 {
-	public float X;
-	public float Y;
+    public float X;
+    public float Y;
 	
-	public Position(float x, float y) => (X, Y) = (x, y);
+    public Position(float x, float y) => (X, Y) = (x, y);
 }
 
 struct Size
 {
-	public float Width;
-	public float Height;
+    public float Width;
+    public float Height;
 	
-	public Size(float width, float height) => (Width, Height) = (width, height);
+    public Size(float width, float height) => (Width, Height) = (width, height);
 }
 
 // example code
@@ -36,9 +36,9 @@ EntityDatabase entityDatabase;
 // build an EntityLayout via EntityLayoutBuilder fluent api
 // an EntityLayout may be stored and reused for multiple entities (recommended)
 var entityLayout = EntityLayoutBuilder.Create()
-	.Add<Position>()
-	.Add<Size>()
-	.Build();
+    .Add<Position>()
+    .Add<Size>()
+    .Build();
 	
 // define component data
 entityLayout.Set(new Position(10, 25));
@@ -94,18 +94,18 @@ This allows the ForEach operation to be cache-safe, maximizing cache line usage.
 ```c#
 struct Position
 {
-	public float X;
-	public float Y;
+    public float X;
+    public float Y;
 	
-	public Position(float x, float y) => (X, Y) = (x, y);
+    public Position(float x, float y) => (X, Y) = (x, y);
 }
 
 struct Velocity
 {
-	public float Dx;
-	public float Dy;
+    public float Dx;
+    public float Dy;
 	
-	public Position(float dx, float dy) => (Dx, Dy) = (dx, dy);
+    public Position(float dx, float dy) => (Dx, Dy) = (dx, dy);
 }
 
 // example code
@@ -114,28 +114,28 @@ float timeDelta = 0.01f;
 
 // component ForEach
 entityDatabase.ForEach((ref Position position, ref Velocity velocity) => {
-	position.X += velocity.Dx * timeDelta;
-	position.Y += velocity.Dy * timeDelta;
+    position.X += velocity.Dx * timeDelta;
+    position.Y += velocity.Dy * timeDelta;
 });
 
 // id component ForEach
 // the entity id may be added as the first parameter of the query function
 entityDatabase.ForEach((uint entityId, ref Position position, ref Velocity velocity) => {
-	position.X += velocity.Dx * timeDelta;
-	position.Y += velocity.Dy * timeDelta;
+    position.X += velocity.Dx * timeDelta;
+    position.Y += velocity.Dy * timeDelta;
 	
-	// do something with entityId
+    // do something with entityId
 });
 
 // entity ForEach
 // slower operation and should be used only when component functions cannot be
 entityDatabase.ForEach((in Entity entity) => {
-	ref var position = entitiy.GetComponent<Position>();
-	ref var velocity = entitiy.GetComponent<Velocity>();
-	position.X += velocity.Dx * timeDelta;
-	position.Y += velocity.Dy * timeDelta;
+    ref var position = entitiy.GetComponent<Position>();
+    ref var velocity = entitiy.GetComponent<Velocity>();
+    position.X += velocity.Dx * timeDelta;
+    position.Y += velocity.Dy * timeDelta;
 	
-	var entityId = entity.Id;
+    var entityId = entity.Id;
 });
 ```
 
@@ -155,26 +155,26 @@ struct Locked { }
 
 struct Health
 {
-	public float Current;
-	public float Max;
+    public float Current;
+    public float Max;
 	
-	public Health(int current, int max) => (Current, Max) = (current, max);
+    public Health(int current, int max) => (Current, Max) = (current, max);
 }
 
 struct Position
 {
-	public float X;
-	public float Y;
+    public float X;
+    public float Y;
 	
-	public Position(float x, float y) => (X, Y) = (x, y);
+    public Position(float x, float y) => (X, Y) = (x, y);
 }
 
 struct Velocity
 {
-	public float Dx;
-	public float Dy;
+    public float Dx;
+    public float Dy;
 	
-	public Position(float dx, float dy) => (Dx, Dy) = (dx, dy);
+    public Position(float dx, float dy) => (Dx, Dy) = (dx, dy);
 }
 
 // example code
@@ -183,18 +183,18 @@ float timeDelta = 0.01f;
 
 // only update positions that aren't locked
 entityDatabase.No<Locked>().ForEach((ref Position position, ref Velocity velocity) => {
-	position.X += velocity.Dx * timeDelta;
-	position.Y += velocity.Dy * timeDelta;
+    position.X += velocity.Dx * timeDelta;
+    position.Y += velocity.Dy * timeDelta;
 });
 
 // heal players and npcs
 entityDatabase.Any<Player, Npc>().ForEach((ref Health health) => {
-	health.Current = Math.Min(health.Max, health.Current + 10);
+    health.Current = Math.Min(health.Max, health.Current + 10);
 });
 
 // move all npcs that aren't locked 5 units to the right
 entityDatabase.With<Npc>().No<Locked>().ForEach((ref Position position) => {
-	position.X += 5;
+    position.X += 5;
 });
 ```
 
@@ -210,9 +210,9 @@ EntityDatabase entityDatabase;
 
 // sub-query
 entityDatabase.ForEach((ref Camera camera) => {
-	entityDatabase.ForEach((ref Sprite sprite) => {
-		// draw sprite for camera
-	});
+    entityDatabase.ForEach((ref Sprite sprite) => {
+        // draw sprite for camera
+    });
 });
 ```
 
@@ -231,7 +231,7 @@ The ParallelOptions may be set via `EntityDatabase.ParallelOptions`
 ```c#
 struct Component
 {
-	public int Value;
+    public int Value;
 }
 
 void OnAdd(uint entityId, ref Component component) { }
