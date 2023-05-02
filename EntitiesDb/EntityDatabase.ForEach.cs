@@ -107,7 +107,6 @@ namespace EntitiesDb
         }
 
         public void ForEach(EntityFunc func) => Query(new EntityQuery(func), false);
-        public void ForEach(IdEntityFunc func) => Query(new IdEntityQuery(func), false);
 
         public void ParallelForEach<T1>(ComponentFunc<T1> func)
             where T1 : unmanaged
@@ -212,6 +211,5 @@ namespace EntitiesDb
         }
 
         public void ParallelForEach(EntityFunc func) => Query(new EntityQuery(func), true);
-        public void ParallelForEach(IdEntityFunc func) => Query(new IdEntityQuery(func), true);
     }
 }

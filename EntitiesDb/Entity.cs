@@ -9,6 +9,8 @@ namespace EntitiesDb
         internal EntityChunk Chunk;
         internal int ListIndex;
 
+        public unsafe uint Id => Chunk.EntityIds[ListIndex];
+
         internal Entity(EntityGroup group, EntityChunk chunk, int listIndex)
         {
             Group = group;

@@ -28,8 +28,8 @@ namespace EntitiesDb.Components
                         {
                             Id = id,
                             Size = ZeroSize ? 0 : sizeof(T),
-                            OnAdd = (dispatcher, entityId, component) => dispatcher.PublishAdd(entityId, ref Unsafe.AsRef<T>(component)),
-                            OnRemove = (dispatcher, entityId, component) => dispatcher.PublishRemove(entityId, ref Unsafe.AsRef<T>(component)),
+                            OnAdd = (entityDatabase, entityId, component) => entityDatabase.PublishAddEvent(entityId, ref Unsafe.AsRef<T>(component)),
+                            OnRemove = (entityDatabase, entityId, component) => entityDatabase.PublishRemoveEvent(entityId, ref Unsafe.AsRef<T>(component)),
                         };
                         _typeMap[typeof(T)] = id;
                         _id = id;

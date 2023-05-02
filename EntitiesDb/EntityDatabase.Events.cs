@@ -6,6 +6,7 @@ namespace EntitiesDb
     {
         public void Subscribe<T>(Event @event, ComponentHandler<T> handler) where T : unmanaged
         {
+            ThrowIfStructuralChangeBlocked();
             switch (@event)
             {
                 case Event.OnAdd:
@@ -19,6 +20,7 @@ namespace EntitiesDb
 
         public void Unsubscribe<T>(Event @event, ComponentHandler<T> handler) where T : unmanaged
         {
+            ThrowIfStructuralChangeBlocked();
             switch (@event)
             {
                 case Event.OnAdd:
@@ -28,6 +30,34 @@ namespace EntitiesDb
                     _eventDispatcher.UnsubscribeOnRemove(handler);
                     break;
             }
+        }
+
+        internal void PublishAddEvent<T>(uint entityId, ref T component) where T : unmanaged
+        {
+            _inEvent = true;
+            try
+            {
+                _eventDispatcher.PublishAdd(entityId, ref component);
+            }
+            catch (Exception e)
+            {
+                _eventExceptions.Add(e);
+            }
+            _inEvent = false;
+        }
+
+        internal void PublishRemoveEvent<T>(uint entityId, ref T component) where T : unmanaged
+        {
+            _inEvent = true;
+            try
+            {
+                _eventDispatcher.PublishRemove(entityId, ref component);
+            }
+            catch (Exception e)
+            {
+                _eventExceptions.Add(e);
+            }
+            _inEvent = false;
         }
     }
 }

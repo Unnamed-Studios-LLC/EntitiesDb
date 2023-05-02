@@ -22,6 +22,8 @@ namespace EntitiesDb
         private readonly Dictionary<EntityGroup, int> _parallelIndicesMap = new();
         private readonly Stack<List<EnumerationJob>> _jobListCache = new();
         private readonly EventDispatcher _eventDispatcher = new();
+        private readonly EntityLayout _disableLayout;
+        private readonly EntityLayout _enableLayout;
 
         private readonly List<Exception> _eventExceptions = new();
 
@@ -42,6 +44,14 @@ namespace EntitiesDb
         {
             ResetQueryFilter();
             PrePopulateCaches();
+
+            _disableLayout = EntityLayoutBuilder.Create()
+                .Add<Disabled>()
+                .Build();
+
+            _enableLayout = EntityLayoutBuilder.Create()
+                .Remove<Disabled>()
+                .Build();
         }
 
         public unsafe void ApplyLayout(uint entityId, EntityLayout layout)
@@ -83,14 +93,7 @@ namespace EntitiesDb
                         }
                         else destinationPtr = null;
 
-                        try
-                        {
-                            componentType.OnRemove(_eventDispatcher, entityId, destinationPtr);
-                        }
-                        catch (Exception e)
-                        {
-                            _eventExceptions.Add(e);
-                        }
+                        componentType.OnRemove(this, entityId, destinationPtr);
                     }
                 }
 
@@ -157,14 +160,7 @@ namespace EntitiesDb
                     }
                     else destinationPtr = null;
 
-                    try
-                    {
-                        componentType.OnAdd(_eventDispatcher, entityId, destinationPtr);
-                    }
-                    catch (Exception e)
-                    {
-                        _eventExceptions.Add(e);
-                    }
+                    componentType.OnAdd(this, entityId, destinationPtr);
                 }
             }
 
@@ -172,7 +168,7 @@ namespace EntitiesDb
             ReturnArchetype(destinationArchetype);
         }
 
-        public unsafe uint Clone(uint entityId)
+        public unsafe uint CloneEntity(uint entityId)
         {
             if (!_entityMap.ContainsKey(entityId)) ThrowEntityNotFound();
 
@@ -203,14 +199,7 @@ namespace EntitiesDb
                     }
                     else destinationPtr = null;
 
-                    try
-                    {
-                        componentType.OnAdd(_eventDispatcher, entityId, destinationPtr);
-                    }
-                    catch (Exception e)
-                    {
-                        _eventExceptions.Add(e);
-                    }
+                    componentType.OnAdd(this, entityId, destinationPtr);
                 }
             }
             return newEntityId;
@@ -271,14 +260,7 @@ namespace EntitiesDb
                 }
                 else destinationPtr = null;
 
-                try
-                {
-                    componentType.OnRemove(_eventDispatcher, entityId, destinationPtr);
-                }
-                catch (Exception e)
-                {
-                    _eventExceptions.Add(e);
-                }
+                componentType.OnRemove(this, entityId, destinationPtr);
             }
 
             // remove from group
@@ -292,6 +274,8 @@ namespace EntitiesDb
             return true;
         }
 
+        public void DisableEntity(uint entityId) => ApplyLayout(entityId, _disableLayout);
+
         public void Dispose()
         {
             ThrowIfStructuralChangeBlocked();
@@ -301,6 +285,8 @@ namespace EntitiesDb
             _archetypeMap.Clear();
             _eventDispatcher.Clear();
         }
+
+        public void EnableEntity(uint entityId) => ApplyLayout(entityId, _enableLayout);
 
         public bool EntityExists(uint entityId) => _entityMap.ContainsKey(entityId);
 
@@ -326,20 +312,6 @@ namespace EntitiesDb
         {
             if (!_entityMap.TryGetValue(entityId, out var reference)) ThrowEntityNotFound();
             return ref reference.TryGetComponent<T>(out found);
-        }
-
-        internal void PublishAddEvent<T>(uint entityId, ref T component) where T : unmanaged
-        {
-            _inEvent = true;
-            _eventDispatcher.PublishAdd(entityId, ref component);
-            _inEvent = false;
-        }
-
-        internal void PublishRemoveEvent<T>(uint entityId, ref T component) where T : unmanaged
-        {
-            _inEvent = true;
-            _eventDispatcher.PublishRemove(entityId, ref component);
-            _inEvent = false;
         }
 
         private void AddtoFilter(ref Archetype archetype, int typeId)
@@ -568,8 +540,8 @@ namespace EntitiesDb
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ThrowIfStructuralChangeBlocked()
         {
-            if (_iterators != 0) throw new Exception("Entity structural change not allowed during ForEach.");
-            if (_inEvent) throw new Exception("Entity structural change not allowed during event handler.");
+            if (_iterators != 0) throw new Exception("Structural change not allowed during ForEach.");
+            if (_inEvent) throw new Exception("Structural change not allowed during event handler.");
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
