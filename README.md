@@ -3,7 +3,7 @@ In memory Entity Component Database. Supports queries, enumeration, multi-thread
 
 ## Setup
 
-Install the package via the nuget package [UnnamedStudios.EntitiesDb](https://www.nuget.org/packages/UnnamedStudios.EntitiesDb)
+Install via nuget: [UnnamedStudios.EntitiesDb](https://www.nuget.org/packages/UnnamedStudios.EntitiesDb)
 
 ## Adding and Removing Entities
 
