@@ -1,5 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using EntitiesDb.Cache;
 using EntitiesDb.Components;
 using EntitiesDb.Data;
 using EntitiesDb.Events;
@@ -18,7 +19,6 @@ namespace EntitiesDb
         private readonly Dictionary<Archetype, EntityGroup> _archetypeMap = new();
         private readonly Dictionary<long, List<EntityGroup>> _archetypeIndexBuckets = new();
         private readonly Dictionary<uint, EntityReference> _entityMap = new();
-        private readonly List<Stack<Archetype>> _archetypeCache = new();
         private readonly Dictionary<EntityGroup, int> _parallelIndicesMap = new();
         private readonly Stack<List<EnumerationJob>> _jobListCache = new();
         private readonly EventDispatcher _eventDispatcher = new();
@@ -33,7 +33,6 @@ namespace EntitiesDb
         private int _iterators = 0;
         private int _inParallel = 0;
         private bool _inEvent = false;
-        private QueryFilter _queryFilter;
 
         public int Count { get; private set; }
         public IReadOnlyList<Exception> EventExceptions => _eventExceptions;
@@ -42,7 +41,6 @@ namespace EntitiesDb
 
         public EntityDatabase()
         {
-            ResetQueryFilter();
             PrePopulateCaches();
 
             _disableLayout = EntityLayoutBuilder.Create()
@@ -65,7 +63,7 @@ namespace EntitiesDb
             // determine destination archetype
             var currentArchetype = reference.Group?.Archetype ?? default;
             var depthResult = layout.GetDepthResult(currentArchetype);
-            var destinationArchetype = RentArchetype(depthResult);
+            var destinationArchetype = ArchetypeCache.Rent(depthResult);
             layout.Apply(currentArchetype, destinationArchetype);
 
             // establish destination group
@@ -165,7 +163,7 @@ namespace EntitiesDb
             }
 
             // cleanup
-            ReturnArchetype(destinationArchetype);
+            ArchetypeCache.Return(destinationArchetype);
         }
 
         public unsafe uint CloneEntity(uint entityId)
@@ -314,87 +312,7 @@ namespace EntitiesDb
             return ref reference.TryGetComponent<T>(out found);
         }
 
-        private void AddtoFilter(ref Archetype archetype, int typeId)
-        {
-            var depth = typeId / 64;
-            if (depth + 1 > archetype.Depth)
-            {
-                var newArchetype = RentArchetype(depth + 1);
-                archetype.CopyTo(newArchetype);
-                ReturnArchetype(archetype);
-                archetype = newArchetype;
-            }
-
-            archetype[depth] |= 1ul << (typeId % 64);
-        }
-
-        private void ClearEventExceptions()
-        {
-            _eventExceptions.Clear();
-        }
-
-        private void ClearParallel()
-        {
-            _parallelIndicesMap.Clear();
-            _nextParallelIndex = 0;
-        }
-
-        private uint GenerateEntityId()
-        {
-            if (_entityMap.Count >= int.MaxValue) throw new Exception("Maximum entities reached");
-            uint id;
-            do
-            {
-                id = _nextEntityId++;
-            }
-            while (_entityMap.ContainsKey(id));
-            return id;
-        }
-
-        private EntityGroup? GetOrCreateGroup(Archetype destinationArchetype)
-        {
-            if (destinationArchetype.Depth == 0) return null;
-            ref var value = ref CollectionsMarshal.GetValueRefOrAddDefault(_archetypeMap, destinationArchetype, out var exists);
-            if (!exists || value == null)
-            {
-                var groupArchetype = RentArchetype(destinationArchetype.Depth);
-                destinationArchetype.CopyTo(groupArchetype);
-
-                value = new EntityGroup(groupArchetype);
-                foreach (var index in value.Archetype.GetIndices())
-                {
-                    ref var indexBucket = ref CollectionsMarshal.GetValueRefOrAddDefault(_archetypeIndexBuckets, index, out exists);
-                    if (!exists || indexBucket == null) indexBucket = new();
-                    indexBucket.Add(value);
-                }
-                _groups.Add(value);
-            }
-            return value;
-        }
-
-        private void MapParallelIndices(EntityGroup group)
-        {
-            // get next indices index
-            var indicesIndex = _nextParallelIndex++;
-
-            // expand indices array if needed
-            if (indicesIndex * 6 >= _parallelIndices.Length)
-            {
-                var newIndices = new int[_parallelIndices.Length * 2];
-                Array.Copy(_parallelIndices, newIndices, _parallelIndices.Length);
-                _parallelIndices = newIndices;
-            }
-
-            _parallelIndicesMap[group] = indicesIndex;
-        }
-
-        private void PrePopulateCaches()
-        {
-            for (int i = 0; i < 8; i++) _jobListCache.Push(new List<EnumerationJob>());
-            for (int i = 1; i <= 4; i++) _archetypeCache.Add(new Stack<Archetype>());
-        }
-
-        private unsafe void Query<T>(T query, bool parallel) where T : IQuery
+        internal unsafe void Query<T>(T query, bool parallel, QueryFilter queryFilter) where T : IQuery
         {
             Interlocked.Increment(ref _iterators);
             parallel = parallel && ParallelEnabled && Interlocked.CompareExchange(ref _inParallel, 1, 0) == 0;
@@ -403,12 +321,11 @@ namespace EntitiesDb
                 foreach (var id in query.GetRequiredIds())
                 {
                     // add required ids to with filter
-                    AddtoFilter(ref _queryFilter.With, id);
+                    QueryFilter.AddtoFilter(ref queryFilter.WithFilter, id);
                 }
 
                 // determine jobs
-                var queryFilter = TakeQueryFilter();
-                var index = queryFilter.With.GetQueryIndex();
+                var index = queryFilter.WithFilter.GetQueryIndex();
                 var groupList = _archetypeIndexBuckets.TryGetValue(index, out var indexGroup) ? indexGroup : _groups;
                 var jobList = RentJobList();
                 foreach (var group in groupList)
@@ -424,7 +341,7 @@ namespace EntitiesDb
                 }
 
                 // recycle query filter
-                RecycleQueryFilter(queryFilter);
+                queryFilter.Return();
 
                 // enumerate chunks
                 if (!parallel)
@@ -463,36 +380,69 @@ namespace EntitiesDb
             }
         }
 
-        private void RecycleQueryFilter(QueryFilter queryFilter)
+        private void ClearEventExceptions()
         {
-            ReturnArchetype(queryFilter.Any);
-            ReturnArchetype(queryFilter.No);
-            ReturnArchetype(queryFilter.With);
+            _eventExceptions.Clear();
         }
 
-        private void RemoveFromFilter(ref Archetype archetype, int typeId)
+        private void ClearParallel()
         {
-            var depth = typeId / 64;
-            if (depth + 1 > archetype.Depth) return;
-            archetype[depth] &= ~(1ul << (typeId % 64));
+            _parallelIndicesMap.Clear();
+            _nextParallelIndex = 0;
+        }
 
-            if (depth + 1 == archetype.Depth &&
-                archetype[depth] == 0)
+        private uint GenerateEntityId()
+        {
+            if (_entityMap.Count >= int.MaxValue) throw new Exception("Maximum entities reached");
+            uint id;
+            do
             {
-                var newArchetype = RentArchetype(depth);
-                archetype.CopyTo(newArchetype);
-                ReturnArchetype(archetype);
-                archetype = newArchetype;
+                id = _nextEntityId++;
             }
+            while (_entityMap.ContainsKey(id));
+            return id;
         }
 
-        private Archetype RentArchetype(int depth)
+        private EntityGroup? GetOrCreateGroup(Archetype destinationArchetype)
         {
-            if (depth == 0) return default;
-            while (depth >= _archetypeCache.Count) _archetypeCache.Add(new Stack<Archetype>());
-            var cache = _archetypeCache[depth];
-            if (!cache.TryPop(out var result)) result = new(new ulong[depth]);
-            return result;
+            if (destinationArchetype.Depth == 0) return null;
+            ref var value = ref CollectionsMarshal.GetValueRefOrAddDefault(_archetypeMap, destinationArchetype, out var exists);
+            if (!exists || value == null)
+            {
+                var groupArchetype = ArchetypeCache.Rent(destinationArchetype.Depth);
+                destinationArchetype.CopyTo(groupArchetype);
+
+                value = new EntityGroup(groupArchetype);
+                foreach (var index in value.Archetype.GetIndices())
+                {
+                    ref var indexBucket = ref CollectionsMarshal.GetValueRefOrAddDefault(_archetypeIndexBuckets, index, out exists);
+                    if (!exists || indexBucket == null) indexBucket = new();
+                    indexBucket.Add(value);
+                }
+                _groups.Add(value);
+            }
+            return value;
+        }
+
+        private void MapParallelIndices(EntityGroup group)
+        {
+            // get next indices index
+            var indicesIndex = _nextParallelIndex++;
+
+            // expand indices array if needed
+            if (indicesIndex * 6 >= _parallelIndices.Length)
+            {
+                var newIndices = new int[_parallelIndices.Length * 2];
+                Array.Copy(_parallelIndices, newIndices, _parallelIndices.Length);
+                _parallelIndices = newIndices;
+            }
+
+            _parallelIndicesMap[group] = indicesIndex;
+        }
+
+        private void PrePopulateCaches()
+        {
+            for (int i = 0; i < 8; i++) _jobListCache.Push(new List<EnumerationJob>());
         }
 
         private List<EnumerationJob> RentJobList()
@@ -503,24 +453,6 @@ namespace EntitiesDb
             }
         }
 
-        private void ResetQueryFilter()
-        {
-            _queryFilter = default;
-            AddtoFilter(ref _queryFilter.No, ComponentRegistry.Type<Disabled>.Id);
-        }
-
-        private Archetype ReturnArchetype(Archetype archetype)
-        {
-            if (archetype.Depth != 0)
-            {
-                while (archetype.Depth >= _archetypeCache.Count) _archetypeCache.Add(new Stack<Archetype>());
-                var cache = _archetypeCache[archetype.Depth];
-                archetype.Clear();
-                cache.Push(archetype);
-            }
-            return default;
-        }
-
         private void ReturnJobList(List<EnumerationJob> jobList)
         {
             jobList.Clear();
@@ -528,13 +460,6 @@ namespace EntitiesDb
             {
                 _jobListCache.Push(jobList);
             }
-        }
-
-        private QueryFilter TakeQueryFilter()
-        {
-            var queryFilter = _queryFilter;
-            ResetQueryFilter();
-            return queryFilter;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

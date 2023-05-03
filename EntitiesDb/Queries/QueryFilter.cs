@@ -1,18 +1,568 @@
-﻿using EntitiesDb.Mapping;
+﻿using EntitiesDb.Cache;
+using EntitiesDb.Components;
+using EntitiesDb.Mapping;
 
 namespace EntitiesDb.Queries
 {
-    internal struct QueryFilter
+    public struct QueryFilter
     {
-        public Archetype Any;
-        public Archetype No;
-        public Archetype With;
+        internal Archetype AnyFilter;
+        internal Archetype NoFilter;
+        internal Archetype WithFilter;
 
-        public bool Contains(in Archetype archetype)
+        private readonly EntityDatabase _entityDatabase;
+
+        public QueryFilter(EntityDatabase entityDatabase)
         {
-            return archetype.ContainsAny(in Any) &&
-                !archetype.ContainsAny(in No) &&
-                archetype.ContainsAll(in With);
+            AnyFilter = default;
+            NoFilter = default;
+            WithFilter = default;
+            _entityDatabase = entityDatabase;
+            AddtoFilter(ref NoFilter, ComponentRegistry.Type<Disabled>.Id);
+        }
+
+        public QueryFilter Any<T1>()
+            where T1 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            AddtoFilter(ref AnyFilter, id1);
+            return this;
+        }
+
+        public QueryFilter Any<T1, T2>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            AddtoFilter(ref AnyFilter, id1);
+            AddtoFilter(ref AnyFilter, id2);
+            return this;
+        }
+
+        public QueryFilter Any<T1, T2, T3>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            AddtoFilter(ref AnyFilter, id1);
+            AddtoFilter(ref AnyFilter, id2);
+            AddtoFilter(ref AnyFilter, id3);
+            return this;
+        }
+
+        public QueryFilter Any<T1, T2, T3, T4>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id4 = ComponentRegistry.Type<T4>.Id;
+            AddtoFilter(ref AnyFilter, id1);
+            AddtoFilter(ref AnyFilter, id2);
+            AddtoFilter(ref AnyFilter, id3);
+            AddtoFilter(ref AnyFilter, id4);
+            return this;
+        }
+
+        public QueryFilter Any<T1, T2, T3, T4, T5>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id4 = ComponentRegistry.Type<T4>.Id;
+            var id5 = ComponentRegistry.Type<T5>.Id;
+            AddtoFilter(ref AnyFilter, id1);
+            AddtoFilter(ref AnyFilter, id2);
+            AddtoFilter(ref AnyFilter, id3);
+            AddtoFilter(ref AnyFilter, id4);
+            AddtoFilter(ref AnyFilter, id5);
+            return this;
+        }
+
+        public QueryFilter Any<T1, T2, T3, T4, T5, T6>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+            where T6 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id4 = ComponentRegistry.Type<T4>.Id;
+            var id5 = ComponentRegistry.Type<T5>.Id;
+            var id6 = ComponentRegistry.Type<T6>.Id;
+            AddtoFilter(ref AnyFilter, id1);
+            AddtoFilter(ref AnyFilter, id2);
+            AddtoFilter(ref AnyFilter, id3);
+            AddtoFilter(ref AnyFilter, id4);
+            AddtoFilter(ref AnyFilter, id5);
+            AddtoFilter(ref AnyFilter, id6);
+            return this;
+        }
+
+        public QueryFilter IncludeDisabled()
+        {
+            var disabledId = ComponentRegistry.Type<Disabled>.Id;
+            RemoveFromFilter(ref NoFilter, disabledId);
+            return this;
+        }
+
+        public QueryFilter No<T1>()
+            where T1 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            AddtoFilter(ref NoFilter, id1);
+            return this;
+        }
+
+        public QueryFilter No<T1, T2>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            AddtoFilter(ref NoFilter, id1);
+            AddtoFilter(ref NoFilter, id2);
+            return this;
+        }
+
+        public QueryFilter No<T1, T2, T3>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            AddtoFilter(ref NoFilter, id1);
+            AddtoFilter(ref NoFilter, id2);
+            AddtoFilter(ref NoFilter, id3);
+            return this;
+        }
+
+        public QueryFilter No<T1, T2, T3, T4>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id4 = ComponentRegistry.Type<T4>.Id;
+            AddtoFilter(ref NoFilter, id1);
+            AddtoFilter(ref NoFilter, id2);
+            AddtoFilter(ref NoFilter, id3);
+            AddtoFilter(ref NoFilter, id4);
+            return this;
+        }
+
+        public QueryFilter No<T1, T2, T3, T4, T5>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id4 = ComponentRegistry.Type<T4>.Id;
+            var id5 = ComponentRegistry.Type<T5>.Id;
+            AddtoFilter(ref NoFilter, id1);
+            AddtoFilter(ref NoFilter, id2);
+            AddtoFilter(ref NoFilter, id3);
+            AddtoFilter(ref NoFilter, id4);
+            AddtoFilter(ref NoFilter, id5);
+            return this;
+        }
+
+        public QueryFilter No<T1, T2, T3, T4, T5, T6>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+            where T6 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id4 = ComponentRegistry.Type<T4>.Id;
+            var id5 = ComponentRegistry.Type<T5>.Id;
+            var id6 = ComponentRegistry.Type<T6>.Id;
+            AddtoFilter(ref NoFilter, id1);
+            AddtoFilter(ref NoFilter, id2);
+            AddtoFilter(ref NoFilter, id3);
+            AddtoFilter(ref NoFilter, id4);
+            AddtoFilter(ref NoFilter, id5);
+            AddtoFilter(ref NoFilter, id6);
+            return this;
+        }
+
+        public QueryFilter With<T1>()
+            where T1 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            AddtoFilter(ref WithFilter, id1);
+            return this;
+        }
+
+        public QueryFilter With<T1, T2>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            AddtoFilter(ref WithFilter, id1);
+            AddtoFilter(ref WithFilter, id2);
+            return this;
+        }
+
+        public QueryFilter With<T1, T2, T3>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            AddtoFilter(ref WithFilter, id1);
+            AddtoFilter(ref WithFilter, id2);
+            AddtoFilter(ref WithFilter, id3);
+            return this;
+        }
+
+        public QueryFilter With<T1, T2, T3, T4>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id4 = ComponentRegistry.Type<T4>.Id;
+            AddtoFilter(ref WithFilter, id1);
+            AddtoFilter(ref WithFilter, id2);
+            AddtoFilter(ref WithFilter, id3);
+            AddtoFilter(ref WithFilter, id4);
+            return this;
+        }
+
+        public QueryFilter With<T1, T2, T3, T4, T5>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id4 = ComponentRegistry.Type<T4>.Id;
+            var id5 = ComponentRegistry.Type<T5>.Id;
+            AddtoFilter(ref WithFilter, id1);
+            AddtoFilter(ref WithFilter, id2);
+            AddtoFilter(ref WithFilter, id3);
+            AddtoFilter(ref WithFilter, id4);
+            AddtoFilter(ref WithFilter, id5);
+            return this;
+        }
+
+        public QueryFilter With<T1, T2, T3, T4, T5, T6>()
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+            where T6 : unmanaged
+        {
+            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id4 = ComponentRegistry.Type<T4>.Id;
+            var id5 = ComponentRegistry.Type<T5>.Id;
+            var id6 = ComponentRegistry.Type<T6>.Id;
+            AddtoFilter(ref WithFilter, id1);
+            AddtoFilter(ref WithFilter, id2);
+            AddtoFilter(ref WithFilter, id3);
+            AddtoFilter(ref WithFilter, id4);
+            AddtoFilter(ref WithFilter, id5);
+            AddtoFilter(ref WithFilter, id6);
+            return this;
+        }
+
+        public void ForEach<T1>(ComponentFunc<T1> func)
+            where T1 : unmanaged
+        {
+            Query(new ComponentQuery<T1>(func), false);
+        }
+
+        public void ForEach<T1, T2>(ComponentFunc<T1, T2> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+        {
+            Query(new ComponentQuery<T1, T2>(func), false);
+        }
+
+        public void ForEach<T1, T2, T3>(ComponentFunc<T1, T2, T3> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+        {
+            Query(new ComponentQuery<T1, T2, T3>(func), false);
+        }
+
+        public void ForEach<T1, T2, T3, T4>(ComponentFunc<T1, T2, T3, T4> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+        {
+            Query(new ComponentQuery<T1, T2, T3, T4>(func), false);
+        }
+
+        public void ForEach<T1, T2, T3, T4, T5>(ComponentFunc<T1, T2, T3, T4, T5> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+        {
+            Query(new ComponentQuery<T1, T2, T3, T4, T5>(func), false);
+        }
+
+        public void ForEach<T1, T2, T3, T4, T5, T6>(ComponentFunc<T1, T2, T3, T4, T5, T6> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+            where T6 : unmanaged
+        {
+            Query(new ComponentQuery<T1, T2, T3, T4, T5, T6>(func), false);
+        }
+
+        public void ForEach<T1>(IdComponentFunc<T1> func)
+            where T1 : unmanaged
+        {
+            Query(new IdComponentQuery<T1>(func), false);
+        }
+
+        public void ForEach<T1, T2>(IdComponentFunc<T1, T2> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+        {
+            Query(new IdComponentQuery<T1, T2>(func), false);
+        }
+
+        public void ForEach<T1, T2, T3>(IdComponentFunc<T1, T2, T3> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+        {
+            Query(new IdComponentQuery<T1, T2, T3>(func), false);
+        }
+
+        public void ForEach<T1, T2, T3, T4>(IdComponentFunc<T1, T2, T3, T4> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+        {
+            Query(new IdComponentQuery<T1, T2, T3, T4>(func), false);
+        }
+
+        public void ForEach<T1, T2, T3, T4, T5>(IdComponentFunc<T1, T2, T3, T4, T5> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+        {
+            Query(new IdComponentQuery<T1, T2, T3, T4, T5>(func), false);
+        }
+
+        public void ForEach<T1, T2, T3, T4, T5, T6>(IdComponentFunc<T1, T2, T3, T4, T5, T6> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+            where T6 : unmanaged
+        {
+            Query(new IdComponentQuery<T1, T2, T3, T4, T5, T6>(func), false);
+        }
+
+        public void ForEach(EntityFunc func) => Query(new EntityQuery(func), false);
+
+        public void ParallelForEach<T1>(ComponentFunc<T1> func)
+            where T1 : unmanaged
+        {
+            Query(new ComponentQuery<T1>(func), true);
+        }
+
+        public void ParallelForEach<T1, T2>(ComponentFunc<T1, T2> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+        {
+            Query(new ComponentQuery<T1, T2>(func), true);
+        }
+
+        public void ParallelForEach<T1, T2, T3>(ComponentFunc<T1, T2, T3> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+        {
+            Query(new ComponentQuery<T1, T2, T3>(func), true);
+        }
+
+        public void ParallelForEach<T1, T2, T3, T4>(ComponentFunc<T1, T2, T3, T4> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+        {
+            Query(new ComponentQuery<T1, T2, T3, T4>(func), true);
+        }
+
+        public void ParallelForEach<T1, T2, T3, T4, T5>(ComponentFunc<T1, T2, T3, T4, T5> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+        {
+            Query(new ComponentQuery<T1, T2, T3, T4, T5>(func), true);
+        }
+
+        public void ParallelForEach<T1, T2, T3, T4, T5, T6>(ComponentFunc<T1, T2, T3, T4, T5, T6> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+            where T6 : unmanaged
+        {
+            Query(new ComponentQuery<T1, T2, T3, T4, T5, T6>(func), true);
+        }
+
+        public void ParallelForEach<T1>(IdComponentFunc<T1> func)
+            where T1 : unmanaged
+        {
+            Query(new IdComponentQuery<T1>(func), true);
+        }
+
+        public void ParallelForEach<T1, T2>(IdComponentFunc<T1, T2> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+        {
+            Query(new IdComponentQuery<T1, T2>(func), true);
+        }
+
+        public void ParallelForEach<T1, T2, T3>(IdComponentFunc<T1, T2, T3> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+        {
+            Query(new IdComponentQuery<T1, T2, T3>(func), true);
+        }
+
+        public void ParallelForEach<T1, T2, T3, T4>(IdComponentFunc<T1, T2, T3, T4> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+        {
+            Query(new IdComponentQuery<T1, T2, T3, T4>(func), true);
+        }
+
+        public void ParallelForEach<T1, T2, T3, T4, T5>(IdComponentFunc<T1, T2, T3, T4, T5> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+        {
+            Query(new IdComponentQuery<T1, T2, T3, T4, T5>(func), true);
+        }
+
+        public void ParallelForEach<T1, T2, T3, T4, T5, T6>(IdComponentFunc<T1, T2, T3, T4, T5, T6> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+            where T6 : unmanaged
+        {
+            Query(new IdComponentQuery<T1, T2, T3, T4, T5, T6>(func), true);
+        }
+
+        public void ParallelForEach(EntityFunc func) => Query(new EntityQuery(func), true);
+
+        internal static void AddtoFilter(ref Archetype archetype, int typeId)
+        {
+            var depth = typeId / 64;
+            if (depth + 1 > archetype.Depth)
+            {
+                var newArchetype = ArchetypeCache.Rent(depth + 1);
+                archetype.CopyTo(newArchetype);
+                ArchetypeCache.Return(archetype);
+                archetype = newArchetype;
+            }
+
+            archetype[depth] |= 1ul << (typeId % 64);
+        }
+
+        internal static void RemoveFromFilter(ref Archetype archetype, int typeId)
+        {
+            var depth = typeId / 64;
+            if (depth + 1 > archetype.Depth) return;
+            archetype[depth] &= ~(1ul << (typeId % 64));
+
+            if (depth + 1 == archetype.Depth &&
+                archetype[depth] == 0)
+            {
+                var newArchetype = ArchetypeCache.Rent(depth);
+                archetype.CopyTo(newArchetype);
+                ArchetypeCache.Return(archetype);
+                archetype = newArchetype;
+            }
+        }
+
+        internal bool Contains(in Archetype archetype)
+        {
+            return archetype.ContainsAny(in AnyFilter) &&
+                !archetype.ContainsAny(in NoFilter) &&
+                archetype.ContainsAll(in WithFilter);
+        }
+
+        internal unsafe void Query<T>(T query, bool parallel) where T : IQuery => _entityDatabase.Query(query, parallel, this);
+
+        internal void Return()
+        {
+            ArchetypeCache.Return(AnyFilter);
+            ArchetypeCache.Return(NoFilter);
+            ArchetypeCache.Return(WithFilter);
+
+            AnyFilter = default;
+            NoFilter = default;
+            WithFilter = default;
         }
     }
 }

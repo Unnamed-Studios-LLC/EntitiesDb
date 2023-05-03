@@ -7,14 +7,16 @@ namespace EntitiesDb
         public void ForEach<T1>(ComponentFunc<T1> func)
             where T1 : unmanaged
         {
-            Query(new ComponentQuery<T1>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
         public void ForEach<T1, T2>(ComponentFunc<T1, T2> func)
             where T1 : unmanaged
             where T2 : unmanaged
         {
-            Query(new ComponentQuery<T1, T2>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
         public void ForEach<T1, T2, T3>(ComponentFunc<T1, T2, T3> func)
@@ -22,16 +24,18 @@ namespace EntitiesDb
             where T2 : unmanaged
             where T3 : unmanaged
         {
-            Query(new ComponentQuery<T1, T2, T3>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
-        public void ForEach<T1, T2, T3, T4, T5, T6>(ComponentFunc<T1, T2, T3, T4> func)
+        public void ForEach<T1, T2, T3, T4>(ComponentFunc<T1, T2, T3, T4> func)
             where T1 : unmanaged
             where T2 : unmanaged
             where T3 : unmanaged
             where T4 : unmanaged
         {
-            Query(new ComponentQuery<T1, T2, T3, T4>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
         public void ForEach<T1, T2, T3, T4, T5>(ComponentFunc<T1, T2, T3, T4, T5> func)
@@ -41,7 +45,8 @@ namespace EntitiesDb
             where T4 : unmanaged
             where T5 : unmanaged
         {
-            Query(new ComponentQuery<T1, T2, T3, T4, T5>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
         public void ForEach<T1, T2, T3, T4, T5, T6>(ComponentFunc<T1, T2, T3, T4, T5, T6> func)
@@ -52,20 +57,23 @@ namespace EntitiesDb
 			where T5 : unmanaged
 			where T6 : unmanaged
         {
-			Query(new ComponentQuery<T1, T2, T3, T4, T5, T6>(func), false);
-		}
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
+        }
 
         public void ForEach<T1>(IdComponentFunc<T1> func)
             where T1 : unmanaged
         {
-            Query(new IdComponentQuery<T1>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
         public void ForEach<T1, T2>(IdComponentFunc<T1, T2> func)
             where T1 : unmanaged
             where T2 : unmanaged
         {
-            Query(new IdComponentQuery<T1, T2>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
         public void ForEach<T1, T2, T3>(IdComponentFunc<T1, T2, T3> func)
@@ -73,16 +81,18 @@ namespace EntitiesDb
             where T2 : unmanaged
             where T3 : unmanaged
         {
-            Query(new IdComponentQuery<T1, T2, T3>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
-        public void ForEach<T1, T2, T3, T4, T5, T6>(IdComponentFunc<T1, T2, T3, T4> func)
+        public void ForEach<T1, T2, T3, T4>(IdComponentFunc<T1, T2, T3, T4> func)
             where T1 : unmanaged
             where T2 : unmanaged
             where T3 : unmanaged
             where T4 : unmanaged
         {
-            Query(new IdComponentQuery<T1, T2, T3, T4>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
         public void ForEach<T1, T2, T3, T4, T5>(IdComponentFunc<T1, T2, T3, T4, T5> func)
@@ -92,7 +102,8 @@ namespace EntitiesDb
             where T4 : unmanaged
             where T5 : unmanaged
         {
-            Query(new IdComponentQuery<T1, T2, T3, T4, T5>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
         public void ForEach<T1, T2, T3, T4, T5, T6>(IdComponentFunc<T1, T2, T3, T4, T5, T6> func)
@@ -103,22 +114,29 @@ namespace EntitiesDb
             where T5 : unmanaged
             where T6 : unmanaged
         {
-            Query(new IdComponentQuery<T1, T2, T3, T4, T5, T6>(func), false);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
         }
 
-        public void ForEach(EntityFunc func) => Query(new EntityQuery(func), false);
+        public void ForEach(EntityFunc func)
+        {
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(func);
+        }
 
         public void ParallelForEach<T1>(ComponentFunc<T1> func)
             where T1 : unmanaged
         {
-            Query(new ComponentQuery<T1>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
         public void ParallelForEach<T1, T2>(ComponentFunc<T1, T2> func)
             where T1 : unmanaged
             where T2 : unmanaged
         {
-            Query(new ComponentQuery<T1, T2>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
         public void ParallelForEach<T1, T2, T3>(ComponentFunc<T1, T2, T3> func)
@@ -126,16 +144,18 @@ namespace EntitiesDb
             where T2 : unmanaged
             where T3 : unmanaged
         {
-            Query(new ComponentQuery<T1, T2, T3>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
-        public void ParallelForEach<T1, T2, T3, T4, T5, T6>(ComponentFunc<T1, T2, T3, T4> func)
+        public void ParallelForEach<T1, T2, T3, T4>(ComponentFunc<T1, T2, T3, T4> func)
             where T1 : unmanaged
             where T2 : unmanaged
             where T3 : unmanaged
             where T4 : unmanaged
         {
-            Query(new ComponentQuery<T1, T2, T3, T4>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
         public void ParallelForEach<T1, T2, T3, T4, T5>(ComponentFunc<T1, T2, T3, T4, T5> func)
@@ -145,7 +165,8 @@ namespace EntitiesDb
             where T4 : unmanaged
             where T5 : unmanaged
         {
-            Query(new ComponentQuery<T1, T2, T3, T4, T5>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
         public void ParallelForEach<T1, T2, T3, T4, T5, T6>(ComponentFunc<T1, T2, T3, T4, T5, T6> func)
@@ -156,20 +177,23 @@ namespace EntitiesDb
             where T5 : unmanaged
             where T6 : unmanaged
         {
-            Query(new ComponentQuery<T1, T2, T3, T4, T5, T6>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
         public void ParallelForEach<T1>(IdComponentFunc<T1> func)
             where T1 : unmanaged
         {
-            Query(new IdComponentQuery<T1>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
         public void ParallelForEach<T1, T2>(IdComponentFunc<T1, T2> func)
             where T1 : unmanaged
             where T2 : unmanaged
         {
-            Query(new IdComponentQuery<T1, T2>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
         public void ParallelForEach<T1, T2, T3>(IdComponentFunc<T1, T2, T3> func)
@@ -177,7 +201,8 @@ namespace EntitiesDb
             where T2 : unmanaged
             where T3 : unmanaged
         {
-            Query(new IdComponentQuery<T1, T2, T3>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
         public void ParallelForEach<T1, T2, T3, T4, T5, T6>(IdComponentFunc<T1, T2, T3, T4> func)
@@ -186,7 +211,8 @@ namespace EntitiesDb
             where T3 : unmanaged
             where T4 : unmanaged
         {
-            Query(new IdComponentQuery<T1, T2, T3, T4>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
         public void ParallelForEach<T1, T2, T3, T4, T5>(IdComponentFunc<T1, T2, T3, T4, T5> func)
@@ -196,7 +222,8 @@ namespace EntitiesDb
             where T4 : unmanaged
             where T5 : unmanaged
         {
-            Query(new IdComponentQuery<T1, T2, T3, T4, T5>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
         public void ParallelForEach<T1, T2, T3, T4, T5, T6>(IdComponentFunc<T1, T2, T3, T4, T5, T6> func)
@@ -207,9 +234,14 @@ namespace EntitiesDb
             where T5 : unmanaged
             where T6 : unmanaged
         {
-            Query(new IdComponentQuery<T1, T2, T3, T4, T5, T6>(func), true);
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
         }
 
-        public void ParallelForEach(EntityFunc func) => Query(new EntityQuery(func), true);
+        public void ParallelForEach(EntityFunc func)
+        {
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ParallelForEach(func);
+        }
     }
 }
