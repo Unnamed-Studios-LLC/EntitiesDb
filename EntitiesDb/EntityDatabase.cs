@@ -332,7 +332,12 @@ namespace EntitiesDb
                 {
                     // check against filter
                     if (!queryFilter.Contains(in group.Archetype)) continue;
-                    if (parallel) MapParallelIndices(group);
+                    if (parallel)
+                    {
+                        var indicesIndex = MapParallelIndices(group);
+                        var indices = _parallelIndices.AsSpan(indicesIndex * 6, 6);
+                        query.CopyIndices(group, indices);
+                    }
 
                     for (int i = 0; i < group.ChunkCount; i++)
                     {
@@ -424,7 +429,7 @@ namespace EntitiesDb
             return value;
         }
 
-        private void MapParallelIndices(EntityGroup group)
+        private int MapParallelIndices(EntityGroup group)
         {
             // get next indices index
             var indicesIndex = _nextParallelIndex++;
@@ -438,6 +443,7 @@ namespace EntitiesDb
             }
 
             _parallelIndicesMap[group] = indicesIndex;
+            return indicesIndex;
         }
 
         private void PrePopulateCaches()
