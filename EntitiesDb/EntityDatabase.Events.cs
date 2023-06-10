@@ -1,6 +1,4 @@
-﻿using EntitiesDb.Events;
-
-namespace EntitiesDb
+﻿namespace EntitiesDb
 {
     public partial class EntityDatabase
     {

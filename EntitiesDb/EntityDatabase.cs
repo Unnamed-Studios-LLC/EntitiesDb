@@ -300,6 +300,12 @@ namespace EntitiesDb
             return reference.GetEntity();
         }
 
+        public bool HasComponent<T>(uint entityId) where T : unmanaged
+        {
+            if (!_entityMap.TryGetValue(entityId, out var reference)) ThrowEntityNotFound();
+            return reference.Group != null && reference.Group.Archetype.Contains(ComponentRegistry.Type<T>.Id);
+        }
+
         public void RemoveAllEventHandlers()
         {
             ThrowIfStructuralChangeBlocked();
