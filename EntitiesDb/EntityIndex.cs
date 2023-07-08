@@ -1,4 +1,4 @@
-﻿namespace EntitiesDb.Mapping
+﻿namespace EntitiesDb
 {
     internal readonly struct EntityIndex
     {

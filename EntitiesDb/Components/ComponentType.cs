@@ -1,13 +1,16 @@
-﻿using EntitiesDb.Events;
-
-namespace EntitiesDb.Components
+﻿namespace EntitiesDb.Components
 {
-    internal struct ComponentType
+    public struct ComponentType
     {
+        public Type Type;
         public int Id;
         public int Size;
-        public EventPublisher OnAdd;
-        public EventPublisher OnRemove;
+        internal Func<EntityDatabase, uint, object> Getter;
+        internal Action<EntityDatabase, uint, object> Setter;
+        internal EventPublisher OnAdd;
+        internal EventPublisher OnRemove;
+        internal EntityLayout AddLayout;
+        internal EntityLayout RemoveLayout;
 
         public bool ZeroSize => Size == 0;
     }

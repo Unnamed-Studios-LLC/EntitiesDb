@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace EntitiesDb.Events
+﻿namespace EntitiesDb.Events
 {
     internal unsafe abstract class EventSubscription { }
     internal unsafe sealed class EventSubscription<T> : EventSubscription where T : unmanaged

@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using EntitiesDb.Components;
 using EntitiesDb.Data;
 
 namespace EntitiesDb
@@ -26,6 +27,13 @@ namespace EntitiesDb
             }
             return ref Group.GetComponent<T>(Chunk, ListIndex);
         }
+
+        public bool HasComponent<T>() where T : unmanaged
+        {
+            var id = ComponentRegistry.Type<T>.Id;
+            return Group?.Archetype.Contains(id) ?? false;
+        }
+
         public ref T TryGetComponent<T>(out bool found) where T : unmanaged
         {
             if (Group == null)

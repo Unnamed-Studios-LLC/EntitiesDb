@@ -4,7 +4,6 @@ using EntitiesDb.Cache;
 using EntitiesDb.Components;
 using EntitiesDb.Data;
 using EntitiesDb.Events;
-using EntitiesDb.Mapping;
 using EntitiesDb.Queries;
 
 namespace EntitiesDb
@@ -16,14 +15,12 @@ namespace EntitiesDb
         private static readonly ParallelOptions s_defaultParallelOptions = new();
 
         private readonly List<EntityGroup> _groups = new();
-        private readonly Dictionary<Archetype, EntityGroup> _archetypeMap = new();
+        private readonly Dictionary<EntityArchetype, EntityGroup> _archetypeMap = new();
         private readonly Dictionary<long, List<EntityGroup>> _archetypeIndexBuckets = new();
         private readonly Dictionary<uint, EntityReference> _entityMap = new();
         private readonly Dictionary<EntityGroup, int> _parallelIndicesMap = new();
         private readonly Stack<List<EnumerationJob>> _jobListCache = new();
         private readonly EventDispatcher _eventDispatcher = new();
-        private readonly EntityLayout _disableLayout;
-        private readonly EntityLayout _enableLayout;
 
         private readonly List<Exception> _eventExceptions = new();
 
@@ -42,14 +39,15 @@ namespace EntitiesDb
         public EntityDatabase()
         {
             PrePopulateCaches();
+        }
 
-            _disableLayout = EntityLayoutBuilder.Create()
-                .Add<Disabled>()
-                .Build();
-
-            _enableLayout = EntityLayoutBuilder.Create()
-                .Remove<Disabled>()
-                .Build();
+        public unsafe ref T AddComponent<T>(uint entityId, T data = default) where T : unmanaged
+        {
+            ref var component = ref ComponentRegistry.Get<T>();
+            component.AddLayout.Set(data);
+            ApplyLayout(entityId, component.AddLayout);
+            ref var reference = ref CollectionsMarshal.GetValueRefOrNullRef(_entityMap, entityId);
+            return ref reference.GetComponent<T>();
         }
 
         public unsafe void ApplyLayout(uint entityId, EntityLayout layout)
@@ -80,13 +78,13 @@ namespace EntitiesDb
                     byte* destinationPtr = null;
                     foreach (var id in layout.RemoveArchetype.GetIds())
                     {
-                        ref var componentType = ref ComponentRegistry.GetType(id);
+                        ref var componentType = ref ComponentRegistry.Get(id);
                         if (!componentType.ZeroSize)
                         {
                             while (reference.Group.ComponentIds[i] < id) i++;
                             if (reference.Group.ComponentIds[i] > id) break; // this type is not contained in the current archetype
 
-                            var size = ComponentRegistry.GetType(id).Size;
+                            var size = ComponentRegistry.Get(id).Size;
                             destinationPtr = currentChunk.GetComponent(reference.Group.ListOffsets[i], size, reference.Index.List);
                         }
                         else destinationPtr = null;
@@ -123,14 +121,14 @@ namespace EntitiesDb
                 fixed (byte* data = layout.ComponentData)
                 {
                     int offset = 0;
-                    var hasDataArchetype = new Archetype(layout.HasDataMask);
+                    var hasDataArchetype = new EntityArchetype(layout.HasDataMask);
                     foreach (var id in layout.AddArchetype.GetIds())
                     {
-                        ref var componentType = ref ComponentRegistry.GetType(id);
+                        ref var componentType = ref ComponentRegistry.Get(id);
                         if (!componentType.ZeroSize)
                         {
                             while (reference.Group.ComponentIds[i] < id) i++;
-                            var size = ComponentRegistry.GetType(id).Size;
+                            var size = ComponentRegistry.Get(id).Size;
                             destinationPtr = destinationChunk.GetComponent(reference.Group.ListOffsets[i], size, reference.Index.List);
                             if (hasDataArchetype.Contains(id))
                             {
@@ -149,11 +147,11 @@ namespace EntitiesDb
                 {
                     if (currentArchetype.Contains(id)) continue; // already contains this type
 
-                    ref var componentType = ref ComponentRegistry.GetType(id);
+                    ref var componentType = ref ComponentRegistry.Get(id);
                     if (!componentType.ZeroSize)
                     {
                         while (reference.Group.ComponentIds[i] < id) i++;
-                        var size = ComponentRegistry.GetType(id).Size;
+                        var size = ComponentRegistry.Get(id).Size;
                         destinationPtr = destinationChunk.GetComponent(reference.Group.ListOffsets[i], size, reference.Index.List);
                     }
                     else destinationPtr = null;
@@ -188,11 +186,11 @@ namespace EntitiesDb
                 byte* destinationPtr = null;
                 foreach (var id in destination.Group.Archetype.GetIds())
                 {
-                    ref var componentType = ref ComponentRegistry.GetType(id);
+                    ref var componentType = ref ComponentRegistry.Get(id);
                     if (!componentType.ZeroSize)
                     {
                         while (destination.Group.ComponentIds[i] < id) i++;
-                        var size = ComponentRegistry.GetType(id).Size;
+                        var size = ComponentRegistry.Get(id).Size;
                         destinationPtr = destinationChunk.GetComponent(destination.Group.ListOffsets[i], size, destination.Index.List);
                     }
                     else destinationPtr = null;
@@ -203,19 +201,22 @@ namespace EntitiesDb
             return newEntityId;
         }
 
-        public uint CreateEntity()
+        public uint CreateEntity() => CreateEntity(0);
+        public uint CreateEntity(uint entityId)
         {
             ThrowIfStructuralChangeBlocked();
-            var entityId = GenerateEntityId();
+            if (entityId == 0) entityId = GenerateEntityId();
+            else if (_entityMap.ContainsKey(entityId)) throw new Exception($"Cannot create entity, entity id is already in use!");
             _entityMap.Add(entityId, default);
             Count++;
             return entityId;
         }
 
-        public uint CreateEntity(EntityLayout layout)
+        public uint CreateEntity(EntityLayout layout) => CreateEntity(0, layout);
+        public uint CreateEntity(uint entityId, EntityLayout layout)
         {
             if (layout is null) throw new ArgumentNullException(nameof(layout));
-            var entityId = CreateEntity();
+            entityId = CreateEntity(entityId);
             ApplyLayout(entityId, layout);
             return entityId;
         }
@@ -250,10 +251,10 @@ namespace EntitiesDb
             byte* destinationPtr;
             foreach (var id in reference.Group.Archetype.GetIds())
             {
-                ref var componentType = ref ComponentRegistry.GetType(id);
+                ref var componentType = ref ComponentRegistry.Get(id);
                 if (!componentType.ZeroSize)
                 {
-                    var size = ComponentRegistry.GetType(id).Size;
+                    var size = ComponentRegistry.Get(id).Size;
                     destinationPtr = currentChunk.GetComponent(reference.Group.ListOffsets[i++], size, reference.Index.List);
                 }
                 else destinationPtr = null;
@@ -272,7 +273,7 @@ namespace EntitiesDb
             return true;
         }
 
-        public void DisableEntity(uint entityId) => ApplyLayout(entityId, _disableLayout);
+        public void DisableEntity(uint entityId) => AddComponent<Disabled>(entityId);
 
         public void Dispose()
         {
@@ -284,9 +285,25 @@ namespace EntitiesDb
             _eventDispatcher.Clear();
         }
 
-        public void EnableEntity(uint entityId) => ApplyLayout(entityId, _enableLayout);
+        public void EnableEntity(uint entityId) => RemoveComponent<Disabled>(entityId);
 
         public bool EntityExists(uint entityId) => _entityMap.ContainsKey(entityId);
+
+        public EntityArchetype GetArchetype(uint entityId)
+        {
+            if (!_entityMap.TryGetValue(entityId, out var reference)) ThrowEntityNotFound();
+            return reference.Group?.Archetype ?? default;
+        }
+
+        public ComponentType GetComponentType(int typeId) => ComponentRegistry.Get(typeId);
+        public ComponentType GetComponentType<T>() where T : unmanaged => ComponentRegistry.Get<T>();
+
+        public object GetComponent(uint entityId, int typeId)
+        {
+            if (!_entityMap.TryGetValue(entityId, out var reference)) ThrowEntityNotFound();
+            ref var componentType = ref ComponentRegistry.Get(typeId);
+            return componentType.Getter.Invoke(this, entityId);
+        }
 
         public ref T GetComponent<T>(uint entityId) where T : unmanaged
         {
@@ -310,6 +327,22 @@ namespace EntitiesDb
         {
             ThrowIfStructuralChangeBlocked();
             _eventDispatcher.Clear();
+        }
+
+        public unsafe bool RemoveComponent<T>(uint entityId) where T : unmanaged
+        {
+            ref var component = ref ComponentRegistry.Get<T>();
+            var archetype = GetArchetype(entityId);
+            if (!archetype.Contains(component.Id)) return false;
+            ApplyLayout(entityId, component.RemoveLayout);
+            return true;
+        }
+
+        public void SetComponent(uint entityId, int typeId, object value)
+        {
+            if (!_entityMap.TryGetValue(entityId, out var reference)) ThrowEntityNotFound();
+            ref var componentType = ref ComponentRegistry.Get(typeId);
+            componentType.Setter.Invoke(this, entityId, value);
         }
 
         public ref T TryGetComponent<T>(uint entityId, out bool found) where T : unmanaged
@@ -414,19 +447,19 @@ namespace EntitiesDb
             return id;
         }
 
-        private EntityGroup? GetOrCreateGroup(Archetype destinationArchetype)
+        private EntityGroup? GetOrCreateGroup(EntityArchetype destinationArchetype)
         {
             if (destinationArchetype.Depth == 0) return null;
-            ref var value = ref CollectionsMarshal.GetValueRefOrAddDefault(_archetypeMap, destinationArchetype, out var exists);
-            if (!exists || value == null)
+            if (!_archetypeMap.TryGetValue(destinationArchetype, out var value))
             {
                 var groupArchetype = ArchetypeCache.Rent(destinationArchetype.Depth);
                 destinationArchetype.CopyTo(groupArchetype);
 
                 value = new EntityGroup(groupArchetype);
+                _archetypeMap.Add(groupArchetype, value);
                 foreach (var index in value.Archetype.GetIndices())
                 {
-                    ref var indexBucket = ref CollectionsMarshal.GetValueRefOrAddDefault(_archetypeIndexBuckets, index, out exists);
+                    ref var indexBucket = ref CollectionsMarshal.GetValueRefOrAddDefault(_archetypeIndexBuckets, index, out var exists);
                     if (!exists || indexBucket == null) indexBucket = new();
                     indexBucket.Add(value);
                 }

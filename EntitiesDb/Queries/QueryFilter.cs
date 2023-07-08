@@ -1,14 +1,13 @@
 ﻿using EntitiesDb.Cache;
 using EntitiesDb.Components;
-using EntitiesDb.Mapping;
 
 namespace EntitiesDb.Queries
 {
     public struct QueryFilter
     {
-        internal Archetype AnyFilter;
-        internal Archetype NoFilter;
-        internal Archetype WithFilter;
+        internal EntityArchetype AnyFilter;
+        internal EntityArchetype NoFilter;
+        internal EntityArchetype WithFilter;
 
         private readonly EntityDatabase _entityDatabase;
 
@@ -310,6 +309,7 @@ namespace EntitiesDb.Queries
         public void ForEach<T1>(ComponentFunc<T1> func)
             where T1 : unmanaged
         {
+            ZeroCheck<T1>();
             Query(new ComponentQuery<T1>(func), false);
         }
 
@@ -317,6 +317,8 @@ namespace EntitiesDb.Queries
             where T1 : unmanaged
             where T2 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
             Query(new ComponentQuery<T1, T2>(func), false);
         }
 
@@ -325,6 +327,9 @@ namespace EntitiesDb.Queries
             where T2 : unmanaged
             where T3 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
             Query(new ComponentQuery<T1, T2, T3>(func), false);
         }
 
@@ -334,6 +339,10 @@ namespace EntitiesDb.Queries
             where T3 : unmanaged
             where T4 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
             Query(new ComponentQuery<T1, T2, T3, T4>(func), false);
         }
 
@@ -344,6 +353,11 @@ namespace EntitiesDb.Queries
             where T4 : unmanaged
             where T5 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            ZeroCheck<T5>();
             Query(new ComponentQuery<T1, T2, T3, T4, T5>(func), false);
         }
 
@@ -355,12 +369,91 @@ namespace EntitiesDb.Queries
             where T5 : unmanaged
             where T6 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            ZeroCheck<T5>();
+            ZeroCheck<T6>();
             Query(new ComponentQuery<T1, T2, T3, T4, T5, T6>(func), false);
+        }
+
+        public void ForEach<T1, TState>(TState state, ComponentStateFunc<T1, TState> func)
+            where T1 : unmanaged
+        {
+            ZeroCheck<T1>();
+            Query(new ComponentStateQuery<T1, TState>(func, state), false);
+        }
+
+        public void ForEach<T1, T2, TState>(TState state, ComponentStateFunc<T1, T2, TState> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+        {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            Query(new ComponentStateQuery<T1, T2, TState>(func, state), false);
+        }
+
+        public void ForEach<T1, T2, T3, TState>(TState state, ComponentStateFunc<T1, T2, T3, TState> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+        {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            Query(new ComponentStateQuery<T1, T2, T3, TState>(func, state), false);
+        }
+
+        public void ForEach<T1, T2, T3, T4, TState>(TState state, ComponentStateFunc<T1, T2, T3, T4, TState> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+        {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            Query(new ComponentStateQuery<T1, T2, T3, T4, TState>(func, state), false);
+        }
+
+        public void ForEach<T1, T2, T3, T4, T5, TState>(TState state, ComponentStateFunc<T1, T2, T3, T4, T5, TState> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+        {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            ZeroCheck<T5>();
+            Query(new ComponentStateQuery<T1, T2, T3, T4, T5, TState>(func, state), false);
+        }
+
+        public void ForEach<T1, T2, T3, T4, T5, T6, TState>(TState state, ComponentStateFunc<T1, T2, T3, T4, T5, T6, TState> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+            where T6 : unmanaged
+        {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            ZeroCheck<T5>();
+            ZeroCheck<T6>();
+            Query(new ComponentStateQuery<T1, T2, T3, T4, T5, T6, TState>(func, state), false);
         }
 
         public void ForEach<T1>(IdComponentFunc<T1> func)
             where T1 : unmanaged
         {
+            ZeroCheck<T1>();
             Query(new IdComponentQuery<T1>(func), false);
         }
 
@@ -368,6 +461,8 @@ namespace EntitiesDb.Queries
             where T1 : unmanaged
             where T2 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
             Query(new IdComponentQuery<T1, T2>(func), false);
         }
 
@@ -376,6 +471,9 @@ namespace EntitiesDb.Queries
             where T2 : unmanaged
             where T3 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
             Query(new IdComponentQuery<T1, T2, T3>(func), false);
         }
 
@@ -385,6 +483,10 @@ namespace EntitiesDb.Queries
             where T3 : unmanaged
             where T4 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
             Query(new IdComponentQuery<T1, T2, T3, T4>(func), false);
         }
 
@@ -395,6 +497,11 @@ namespace EntitiesDb.Queries
             where T4 : unmanaged
             where T5 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            ZeroCheck<T5>();
             Query(new IdComponentQuery<T1, T2, T3, T4, T5>(func), false);
         }
 
@@ -406,6 +513,12 @@ namespace EntitiesDb.Queries
             where T5 : unmanaged
             where T6 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            ZeroCheck<T5>();
+            ZeroCheck<T6>();
             Query(new IdComponentQuery<T1, T2, T3, T4, T5, T6>(func), false);
         }
 
@@ -414,6 +527,7 @@ namespace EntitiesDb.Queries
         public void ParallelForEach<T1>(ComponentFunc<T1> func)
             where T1 : unmanaged
         {
+            ZeroCheck<T1>();
             Query(new ComponentQuery<T1>(func), true);
         }
 
@@ -421,6 +535,8 @@ namespace EntitiesDb.Queries
             where T1 : unmanaged
             where T2 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
             Query(new ComponentQuery<T1, T2>(func), true);
         }
 
@@ -429,6 +545,9 @@ namespace EntitiesDb.Queries
             where T2 : unmanaged
             where T3 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
             Query(new ComponentQuery<T1, T2, T3>(func), true);
         }
 
@@ -438,6 +557,10 @@ namespace EntitiesDb.Queries
             where T3 : unmanaged
             where T4 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
             Query(new ComponentQuery<T1, T2, T3, T4>(func), true);
         }
 
@@ -448,6 +571,11 @@ namespace EntitiesDb.Queries
             where T4 : unmanaged
             where T5 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            ZeroCheck<T5>();
             Query(new ComponentQuery<T1, T2, T3, T4, T5>(func), true);
         }
 
@@ -459,12 +587,19 @@ namespace EntitiesDb.Queries
             where T5 : unmanaged
             where T6 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            ZeroCheck<T5>();
+            ZeroCheck<T6>();
             Query(new ComponentQuery<T1, T2, T3, T4, T5, T6>(func), true);
         }
 
         public void ParallelForEach<T1>(IdComponentFunc<T1> func)
             where T1 : unmanaged
         {
+            ZeroCheck<T1>();
             Query(new IdComponentQuery<T1>(func), true);
         }
 
@@ -472,6 +607,8 @@ namespace EntitiesDb.Queries
             where T1 : unmanaged
             where T2 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
             Query(new IdComponentQuery<T1, T2>(func), true);
         }
 
@@ -480,6 +617,9 @@ namespace EntitiesDb.Queries
             where T2 : unmanaged
             where T3 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
             Query(new IdComponentQuery<T1, T2, T3>(func), true);
         }
 
@@ -489,6 +629,10 @@ namespace EntitiesDb.Queries
             where T3 : unmanaged
             where T4 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
             Query(new IdComponentQuery<T1, T2, T3, T4>(func), true);
         }
 
@@ -499,6 +643,11 @@ namespace EntitiesDb.Queries
             where T4 : unmanaged
             where T5 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            ZeroCheck<T5>();
             Query(new IdComponentQuery<T1, T2, T3, T4, T5>(func), true);
         }
 
@@ -510,12 +659,18 @@ namespace EntitiesDb.Queries
             where T5 : unmanaged
             where T6 : unmanaged
         {
+            ZeroCheck<T1>();
+            ZeroCheck<T2>();
+            ZeroCheck<T3>();
+            ZeroCheck<T4>();
+            ZeroCheck<T5>();
+            ZeroCheck<T6>();
             Query(new IdComponentQuery<T1, T2, T3, T4, T5, T6>(func), true);
         }
 
         public void ParallelForEach(EntityFunc func) => Query(new EntityQuery(func), true);
 
-        internal static void AddtoFilter(ref Archetype archetype, int typeId)
+        internal static void AddtoFilter(ref EntityArchetype archetype, int typeId)
         {
             var depth = typeId / 64;
             if (depth + 1 > archetype.Depth)
@@ -529,7 +684,7 @@ namespace EntitiesDb.Queries
             archetype[depth] |= 1ul << (typeId % 64);
         }
 
-        internal static void RemoveFromFilter(ref Archetype archetype, int typeId)
+        internal static void RemoveFromFilter(ref EntityArchetype archetype, int typeId)
         {
             var depth = typeId / 64;
             if (depth + 1 > archetype.Depth) return;
@@ -545,7 +700,7 @@ namespace EntitiesDb.Queries
             }
         }
 
-        internal bool Contains(in Archetype archetype)
+        internal bool Contains(in EntityArchetype archetype)
         {
             return archetype.ContainsAny(in AnyFilter) &&
                 !archetype.ContainsAny(in NoFilter) &&
@@ -563,6 +718,11 @@ namespace EntitiesDb.Queries
             AnyFilter = default;
             NoFilter = default;
             WithFilter = default;
+        }
+
+        private static void ZeroCheck<T1>() where T1 : unmanaged
+        {
+            if (ComponentRegistry.Type<T1>.ZeroSize) throw new Exception($"Zero-size components cannot be iterated!");
         }
     }
 }

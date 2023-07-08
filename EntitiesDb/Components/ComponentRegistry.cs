@@ -6,8 +6,16 @@ namespace EntitiesDb.Components
     {
         internal unsafe static class Type<T> where T : unmanaged
         {
+            static Type()
+            {
+                Id = GetId();
+                ref var component = ref _components[Id];
+                component.AddLayout = EntityLayoutBuilder.Create().Add<T>().Build();
+                component.RemoveLayout = EntityLayoutBuilder.Create().Remove<T>().Build();
+            }
+
             private static int? _id;
-            public static int Id = GetId();
+            public static int Id;
             public static bool ZeroSize = typeof(T).IsZeroSize();
 
             private static int GetId()
@@ -16,37 +24,47 @@ namespace EntitiesDb.Components
                 {
                     if (_id == null)
                     {
-                        var id = typeof(T) == typeof(Disabled) ? 0 : s_nextId++;
-                        if (id >= _types.Length)
+                        var id = s_nextId++;
+                        if (id >= _components.Length)
                         {
-                            var newArray = new ComponentType[_types.Length * 2];
-                            Array.Copy(_types, newArray, _types.Length);
-                            _types = newArray;
+                            var newArray = new ComponentType[_components.Length * 2];
+                            Array.Copy(_components, newArray, _components.Length);
+                            _components = newArray;
                         }
 
-                        _types[id] = new ComponentType
+                        var type = typeof(T);
+                        _components[id] = new ComponentType
                         {
+                            Type = type,
                             Id = id,
                             Size = ZeroSize ? 0 : sizeof(T),
                             OnAdd = (entityDatabase, entityId, component) => entityDatabase.PublishAddEvent(entityId, ref Unsafe.AsRef<T>(component)),
                             OnRemove = (entityDatabase, entityId, component) => entityDatabase.PublishRemoveEvent(entityId, ref Unsafe.AsRef<T>(component)),
+                            Getter = (database, id) => ZeroSize ? new T() : database.GetComponent<T>(id),
+                            Setter = (database, id, value) =>
+                            {
+                                if (ZeroSize) return;
+                                ref var component = ref database.GetComponent<T>(id);
+                                component = (T)value;
+                            }
                         };
-                        _typeMap[typeof(T)] = id;
                         _id = id;
+                        _componentMap[type] = id;
                     }
                     return _id.Value;
                 }
             }
         }
 
-        private static ComponentType[] _types = new ComponentType[64];
-        private static readonly Dictionary<Type, int> _typeMap = new();
+        private static ComponentType[] _components = new ComponentType[64];
+        private static readonly Dictionary<Type, int> _componentMap = new();
         private static readonly object s_lock = new();
         private static int s_nextId = 1;
 
         public static int Count => s_nextId;
 
-        public static ref ComponentType GetType(int componentId) => ref _types[componentId];
-        public static ref ComponentType GetType(Type type) => ref _types[_typeMap[type]];
+        public static ref ComponentType Get(int componentId) => ref _components[componentId];
+        public static ref ComponentType Get(Type type) => ref _components[_componentMap[type]];
+        public static ref ComponentType Get<T>() where T : unmanaged => ref Get(Type<T>.Id);
     }
 }

@@ -1,22 +1,22 @@
-﻿using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using EntitiesDb.Components;
-using EntitiesDb.Queries;
 
-namespace EntitiesDb.Mapping
+namespace EntitiesDb
 {
-    internal unsafe readonly struct Archetype
+    public unsafe readonly struct EntityArchetype
     {
         private readonly ulong[]? _array;
 
-        public Archetype(ulong[]? array)
+        internal EntityArchetype(ulong[]? array)
         {
             _array = array;
         }
 
-        public int Depth => _array?.Length ?? 0;
+        public bool IsDisabled => Contains(ComponentRegistry.Type<Disabled>.Id);
 
-        public ulong this[int index]
+        internal int Depth => _array?.Length ?? 0;
+
+        internal ulong this[int index]
         {
             get => _array != null ? _array[index] : throw new Exception("Attempted to access an empty Archetype");
             set
@@ -26,7 +26,7 @@ namespace EntitiesDb.Mapping
             }
         }
 
-        public static Archetype FromIds(IEnumerable<int> componentIds)
+        public static EntityArchetype FromIds(IEnumerable<int> componentIds)
         {
             int maxDepth = 0;
             foreach (var id in componentIds)
@@ -44,19 +44,7 @@ namespace EntitiesDb.Mapping
                 var bitIndex = id % 64;
                 array[index] |= 1ul << bitIndex;
             }
-            return new Archetype(array);
-        }
-
-        public void Clear()
-        {
-            if (_array == null) return;
-            Array.Clear(_array);
-        }
-
-        public void CopyTo(Archetype archetype)
-        {
-            if (_array == null ||archetype._array == null) return;
-            Array.Copy(_array, archetype._array, Math.Min(_array.Length, archetype._array.Length));
+            return new EntityArchetype(array);
         }
 
         public bool Contains(int componentId)
@@ -67,11 +55,45 @@ namespace EntitiesDb.Mapping
             {
                 return false;
             }
-            var relType = 1ul << (componentId % 64);
+            var relType = 1ul << componentId % 64;
             return (_array[depth] & relType) == relType;
         }
 
-        public bool ContainsAll(in Archetype filter)
+        public IEnumerable<int> GetIds()
+        {
+            if (_array == null) yield break;
+            for (int i = 0; i < Depth; i++)
+            {
+                var relArchetype = _array[i];
+                if (relArchetype == 0) continue;
+
+                for (int j = 0; j < 64; j++)
+                {
+                    var relType = 1ul << j;
+                    if (relType > relArchetype) break;
+
+                    var componentId = i * 64 + j;
+                    if ((relArchetype & relType) == relType)
+                    {
+                        yield return componentId;
+                    }
+                }
+            }
+        }
+
+        internal void Clear()
+        {
+            if (_array == null) return;
+            Array.Clear(_array);
+        }
+
+        internal void CopyTo(EntityArchetype archetype)
+        {
+            if (_array == null || archetype._array == null) return;
+            Array.Copy(_array, archetype._array, Math.Min(_array.Length, archetype._array.Length));
+        }
+
+        internal bool ContainsAll(in EntityArchetype filter)
         {
             if (filter.Depth > Depth) return false;
 
@@ -84,7 +106,7 @@ namespace EntitiesDb.Mapping
             return true;
         }
 
-        public bool ContainsAny(in Archetype filter)
+        internal bool ContainsAny(in EntityArchetype filter)
         {
             var minDepth = Math.Min(Depth, filter.Depth);
             if (minDepth == 0) return true;
@@ -99,11 +121,11 @@ namespace EntitiesDb.Mapping
 
         public override bool Equals([NotNullWhen(true)] object? obj)
         {
-            if (obj is Archetype archetype) return Equals(in archetype);
+            if (obj is EntityArchetype archetype) return Equals(in archetype);
             return base.Equals(obj);
         }
 
-        public bool Equals(in Archetype other)
+        public bool Equals(in EntityArchetype other)
         {
             if (Depth != other.Depth)
             {
@@ -133,7 +155,7 @@ namespace EntitiesDb.Mapping
             return hash;
         }
 
-        public IEnumerable<long> GetIndices()
+        internal IEnumerable<long> GetIndices()
         {
             if (_array == null)
             {
@@ -153,44 +175,22 @@ namespace EntitiesDb.Mapping
                 foreach (var idB in GetIds())
                 {
                     if (i++ < skip) continue;
-                    yield return ((long)idB << 32) | ((uint)idA);
+                    yield return (long)idB << 32 | (uint)idA;
                 }
                 skip++;
             }
         }
 
-        public IEnumerable<int> GetIds()
-        {
-            if (_array == null) yield break;
-            for (int i = 0; i < Depth; i++)
-            {
-                var relArchetype = _array[i];
-                if (relArchetype == 0) continue;
-
-                for (int j = 0; j < 64; j++)
-                {
-                    var relType = 1ul << j;
-                    if (relType > relArchetype) break;
-
-                    var componentId = i * 64 + j;
-                    if ((relArchetype & relType) == relType)
-                    {
-                        yield return componentId;
-                    }
-                }
-            }
-        }
-
-        public IEnumerable<int> GetNonZeroIds()
+        internal IEnumerable<int> GetNonZeroIds()
         {
             foreach (var componentId in GetIds())
             {
-                if (ComponentRegistry.GetType(componentId).ZeroSize) continue;
+                if (ComponentRegistry.Get(componentId).ZeroSize) continue;
                 yield return componentId;
             }
         }
 
-        public long GetQueryIndex()
+        internal long GetQueryIndex()
         {
             if (_array == null) return 0;
 
@@ -207,10 +207,10 @@ namespace EntitiesDb.Mapping
             }
 
             if (idB == -1) return idA;
-            return ((long)idB << 32) | ((uint)idA);
+            return (long)idB << 32 | (uint)idA;
         }
 
-        public int NonZeroIndexOf(int componentId)
+        internal int NonZeroIndexOf(int componentId)
         {
             int i = 0;
             foreach (var id in GetNonZeroIds())
@@ -219,6 +219,16 @@ namespace EntitiesDb.Mapping
                 i++;
             }
             return -1;
+        }
+
+        public static bool operator ==(EntityArchetype left, EntityArchetype right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(EntityArchetype left, EntityArchetype right)
+        {
+            return !(left == right);
         }
     }
 }

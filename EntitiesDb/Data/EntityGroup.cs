@@ -1,7 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using EntitiesDb.Components;
-using EntitiesDb.Mapping;
 
 namespace EntitiesDb.Data
 {
@@ -9,7 +8,7 @@ namespace EntitiesDb.Data
     {
         private const int ChunkAllocSize = 16384;
 
-        public readonly Archetype Archetype;
+        public readonly EntityArchetype Archetype;
 
         private readonly List<EntityChunk> _chunks = new();
         private readonly Dictionary<int, int> _idMap = new();
@@ -17,7 +16,7 @@ namespace EntitiesDb.Data
         private int _workingChunkCount;
         private bool _disposedValue;
 
-        public EntityGroup(Archetype archetype)
+        public EntityGroup(EntityArchetype archetype)
         {
             Archetype = archetype;
 
@@ -31,7 +30,7 @@ namespace EntitiesDb.Data
                 var id = componentIds[i];
                 _idMap[id] = i;
                 listOffsets[i] = offset;
-                var componentSize = ComponentRegistry.GetType(id).Size;
+                var componentSize = ComponentRegistry.Get(id).Size;
                 offset += componentSize * chunkCapacity;
             }
 
@@ -129,7 +128,7 @@ namespace EntitiesDb.Data
                 remappedEntityId = chunk.EntityIds[index.List] = chunk.EntityIds[lastListIndex]; // remap entityId
                 for (int i = 0; i < ComponentIds.Length; i++)
                 {
-                    var componentSize = ComponentRegistry.GetType(ComponentIds[i]).Size;
+                    var componentSize = ComponentRegistry.Get(ComponentIds[i]).Size;
                     var sourcePtr = lastChunk.GetComponent(ListOffsets[i], componentSize, lastListIndex);
                     var destinationPtr = chunk.GetComponent(ListOffsets[i], componentSize, index.List);
                     Buffer.MemoryCopy(sourcePtr, destinationPtr, componentSize, componentSize);
@@ -194,7 +193,7 @@ namespace EntitiesDb.Data
             var lineSize = sizeof(uint); // entityId
             for (int i = 0; i < componentIds.Length; i++)
             {
-                lineSize += ComponentRegistry.GetType(componentIds[i]).Size;
+                lineSize += ComponentRegistry.Get(componentIds[i]).Size;
             }
 
             var lines = ChunkAllocSize / lineSize;

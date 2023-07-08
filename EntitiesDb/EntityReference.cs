@@ -2,7 +2,7 @@
 using EntitiesDb.Components;
 using EntitiesDb.Data;
 
-namespace EntitiesDb.Mapping
+namespace EntitiesDb
 {
     internal readonly struct EntityReference
     {
@@ -39,7 +39,7 @@ namespace EntitiesDb.Mapping
 
                 if (destinationId == sourceId)
                 {
-                    var size = ComponentRegistry.GetType(sourceId).Size;
+                    var size = ComponentRegistry.Get(sourceId).Size;
                     var sourcePtr = sourceChunk.GetComponent(Group.ListOffsets[i], size, Index.List);
                     var destinationPtr = destinationChunk.GetComponent(destination.Group.ListOffsets[j], size, destination.Index.List);
                     Buffer.MemoryCopy(sourcePtr, destinationPtr, size, size);

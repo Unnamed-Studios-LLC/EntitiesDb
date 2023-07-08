@@ -4,7 +4,7 @@ using EntitiesDb.Data;
 
 namespace EntitiesDb.Queries
 {
-    internal unsafe struct ComponentQuery<T1> : IQuery
+    internal unsafe readonly struct ComponentQuery<T1> : IQuery
         where T1 : unmanaged
     {
         private readonly ComponentFunc<T1> _componentFunc;
@@ -37,7 +37,7 @@ namespace EntitiesDb.Queries
         }
     }
 
-    internal unsafe struct ComponentQuery<T1, T2> : IQuery
+    internal unsafe readonly struct ComponentQuery<T1, T2> : IQuery
         where T1 : unmanaged
         where T2 : unmanaged
     {
@@ -75,7 +75,7 @@ namespace EntitiesDb.Queries
         }
     }
 
-    internal unsafe struct ComponentQuery<T1, T2, T3> : IQuery
+    internal unsafe readonly struct ComponentQuery<T1, T2, T3> : IQuery
         where T1 : unmanaged
         where T2 : unmanaged
         where T3 : unmanaged
@@ -118,7 +118,7 @@ namespace EntitiesDb.Queries
         }
     }
 
-    internal unsafe struct ComponentQuery<T1, T2, T3, T4> : IQuery
+    internal unsafe readonly struct ComponentQuery<T1, T2, T3, T4> : IQuery
         where T1 : unmanaged
         where T2 : unmanaged
         where T3 : unmanaged
@@ -166,7 +166,7 @@ namespace EntitiesDb.Queries
         }
     }
 
-    internal unsafe struct ComponentQuery<T1, T2, T3, T4, T5> : IQuery
+    internal unsafe readonly struct ComponentQuery<T1, T2, T3, T4, T5> : IQuery
         where T1 : unmanaged
         where T2 : unmanaged
         where T3 : unmanaged
@@ -219,7 +219,7 @@ namespace EntitiesDb.Queries
         }
     }
 
-    internal unsafe struct ComponentQuery<T1, T2, T3, T4, T5, T6> : IQuery
+    internal unsafe readonly struct ComponentQuery<T1, T2, T3, T4, T5, T6> : IQuery
         where T1 : unmanaged
         where T2 : unmanaged
         where T3 : unmanaged
@@ -256,6 +256,297 @@ namespace EntitiesDb.Queries
                     ref Unsafe.AsRef<T4>(list4),
                     ref Unsafe.AsRef<T5>(list5),
                     ref Unsafe.AsRef<T6>(list6)
+                );
+                list1++;
+                list2++;
+                list3++;
+                list4++;
+                list5++;
+                list6++;
+            }
+        }
+
+        public IEnumerable<int> GetRequiredIds()
+        {
+            yield return ComponentRegistry.Type<T1>.Id;
+            yield return ComponentRegistry.Type<T2>.Id;
+            yield return ComponentRegistry.Type<T3>.Id;
+            yield return ComponentRegistry.Type<T4>.Id;
+            yield return ComponentRegistry.Type<T5>.Id;
+            yield return ComponentRegistry.Type<T6>.Id;
+        }
+    }
+
+    internal unsafe readonly struct ComponentStateQuery<T1, TState> : IQuery
+        where T1 : unmanaged
+    {
+        private readonly ComponentStateFunc<T1, TState> _componentFunc;
+        private readonly TState _state;
+
+        public ComponentStateQuery(ComponentStateFunc<T1, TState> componentFunc, TState state)
+        {
+            _componentFunc = componentFunc;
+            _state = state;
+        }
+
+        public void CopyIndices(EntityGroup group, Span<int> indices) =>
+            group.GetComponentListIndex<T1>(indices);
+
+        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        {
+            var chunk = job.Group.GetChunk(job.ChunkIndex);
+            var count = job.Group.GetChunkLength(job.ChunkIndex);
+            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
+            for (int i = 0; i < count; i++)
+            {
+                _componentFunc.Invoke(
+                    ref Unsafe.AsRef<T1>(list1),
+                    _state
+                );
+                list1++;
+            }
+        }
+
+        public IEnumerable<int> GetRequiredIds()
+        {
+            yield return ComponentRegistry.Type<T1>.Id;
+        }
+    }
+
+    internal unsafe struct ComponentStateQuery<T1, T2, TState> : IQuery
+        where T1 : unmanaged
+        where T2 : unmanaged
+    {
+        private readonly ComponentStateFunc<T1, T2, TState> _componentFunc;
+        private readonly TState _state;
+
+        public ComponentStateQuery(ComponentStateFunc<T1, T2, TState> componentFunc, TState state)
+        {
+            _componentFunc = componentFunc;
+            _state = state;
+        }
+
+        public void CopyIndices(EntityGroup group, Span<int> indices) =>
+            group.GetComponentListIndex<T1, T2>(indices);
+
+        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        {
+            var chunk = job.Group.GetChunk(job.ChunkIndex);
+            var count = job.Group.GetChunkLength(job.ChunkIndex);
+            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
+            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
+            for (int i = 0; i < count; i++)
+            {
+                _componentFunc.Invoke(
+                    ref Unsafe.AsRef<T1>(list1),
+                    ref Unsafe.AsRef<T2>(list2),
+                    _state
+                );
+                list1++;
+                list2++;
+            }
+        }
+
+        public IEnumerable<int> GetRequiredIds()
+        {
+            yield return ComponentRegistry.Type<T1>.Id;
+            yield return ComponentRegistry.Type<T2>.Id;
+        }
+    }
+
+    internal unsafe struct ComponentStateQuery<T1, T2, T3, TState> : IQuery
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+    {
+        private readonly ComponentStateFunc<T1, T2, T3, TState> _componentFunc;
+        private readonly TState _state;
+
+        public ComponentStateQuery(ComponentStateFunc<T1, T2, T3, TState> componentFunc, TState state)
+        {
+            _componentFunc = componentFunc;
+            _state = state;
+        }
+
+        public void CopyIndices(EntityGroup group, Span<int> indices) =>
+            group.GetComponentListIndex<T1, T2, T3>(indices);
+
+        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        {
+            var chunk = job.Group.GetChunk(job.ChunkIndex);
+            var count = job.Group.GetChunkLength(job.ChunkIndex);
+            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
+            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
+            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
+            for (int i = 0; i < count; i++)
+            {
+                _componentFunc.Invoke(
+                    ref Unsafe.AsRef<T1>(list1),
+                    ref Unsafe.AsRef<T2>(list2),
+                    ref Unsafe.AsRef<T3>(list3),
+                    _state
+                );
+                list1++;
+                list2++;
+                list3++;
+            }
+        }
+
+        public IEnumerable<int> GetRequiredIds()
+        {
+            yield return ComponentRegistry.Type<T1>.Id;
+            yield return ComponentRegistry.Type<T2>.Id;
+            yield return ComponentRegistry.Type<T3>.Id;
+        }
+    }
+
+    internal unsafe struct ComponentStateQuery<T1, T2, T3, T4, TState> : IQuery
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+    {
+        private readonly ComponentStateFunc<T1, T2, T3, T4, TState> _componentFunc;
+        private readonly TState _state;
+
+        public ComponentStateQuery(ComponentStateFunc<T1, T2, T3, T4, TState> componentFunc, TState state)
+        {
+            _componentFunc = componentFunc;
+            _state = state;
+        }
+
+        public void CopyIndices(EntityGroup group, Span<int> indices) =>
+            group.GetComponentListIndex<T1, T2, T3, T4>(indices);
+
+        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        {
+            var chunk = job.Group.GetChunk(job.ChunkIndex);
+            var count = job.Group.GetChunkLength(job.ChunkIndex);
+            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
+            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
+            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
+            var list4 = chunk.GetList<T4>(job.Group.ListOffsets[indices[3]]);
+            for (int i = 0; i < count; i++)
+            {
+                _componentFunc.Invoke(
+                    ref Unsafe.AsRef<T1>(list1),
+                    ref Unsafe.AsRef<T2>(list2),
+                    ref Unsafe.AsRef<T3>(list3),
+                    ref Unsafe.AsRef<T4>(list4),
+                    _state
+                );
+                list1++;
+                list2++;
+                list3++;
+                list4++;
+            }
+        }
+
+        public IEnumerable<int> GetRequiredIds()
+        {
+            yield return ComponentRegistry.Type<T1>.Id;
+            yield return ComponentRegistry.Type<T2>.Id;
+            yield return ComponentRegistry.Type<T3>.Id;
+            yield return ComponentRegistry.Type<T4>.Id;
+        }
+    }
+
+    internal unsafe struct ComponentStateQuery<T1, T2, T3, T4, T5, TState> : IQuery
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+    {
+        private readonly ComponentStateFunc<T1, T2, T3, T4, T5, TState> _componentFunc;
+        private readonly TState _state;
+
+        public ComponentStateQuery(ComponentStateFunc<T1, T2, T3, T4, T5, TState> componentFunc, TState state)
+        {
+            _componentFunc = componentFunc;
+            _state = state;
+        }
+
+        public void CopyIndices(EntityGroup group, Span<int> indices) =>
+            group.GetComponentListIndex<T1, T2, T3, T4, T5>(indices);
+
+        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        {
+            var chunk = job.Group.GetChunk(job.ChunkIndex);
+            var count = job.Group.GetChunkLength(job.ChunkIndex);
+            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
+            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
+            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
+            var list4 = chunk.GetList<T4>(job.Group.ListOffsets[indices[3]]);
+            var list5 = chunk.GetList<T5>(job.Group.ListOffsets[indices[4]]);
+            for (int i = 0; i < count; i++)
+            {
+                _componentFunc.Invoke(
+                    ref Unsafe.AsRef<T1>(list1),
+                    ref Unsafe.AsRef<T2>(list2),
+                    ref Unsafe.AsRef<T3>(list3),
+                    ref Unsafe.AsRef<T4>(list4),
+                    ref Unsafe.AsRef<T5>(list5),
+                    _state
+                );
+                list1++;
+                list2++;
+                list3++;
+                list4++;
+                list5++;
+            }
+        }
+
+        public IEnumerable<int> GetRequiredIds()
+        {
+            yield return ComponentRegistry.Type<T1>.Id;
+            yield return ComponentRegistry.Type<T2>.Id;
+            yield return ComponentRegistry.Type<T3>.Id;
+            yield return ComponentRegistry.Type<T4>.Id;
+            yield return ComponentRegistry.Type<T5>.Id;
+        }
+    }
+
+    internal unsafe struct ComponentStateQuery<T1, T2, T3, T4, T5, T6, TState> : IQuery
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+        where T6 : unmanaged
+    {
+        private readonly ComponentStateFunc<T1, T2, T3, T4, T5, T6, TState> _componentFunc;
+        private readonly TState _state;
+
+        public ComponentStateQuery(ComponentStateFunc<T1, T2, T3, T4, T5, T6, TState> componentFunc, TState state)
+        {
+            _componentFunc = componentFunc;
+            _state = state;
+        }
+
+        public void CopyIndices(EntityGroup group, Span<int> indices) =>
+            group.GetComponentListIndex<T1, T2, T3, T4, T5, T6>(indices);
+
+        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        {
+            var chunk = job.Group.GetChunk(job.ChunkIndex);
+            var count = job.Group.GetChunkLength(job.ChunkIndex);
+            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
+            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
+            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
+            var list4 = chunk.GetList<T4>(job.Group.ListOffsets[indices[3]]);
+            var list5 = chunk.GetList<T5>(job.Group.ListOffsets[indices[4]]);
+            var list6 = chunk.GetList<T6>(job.Group.ListOffsets[indices[5]]);
+            for (int i = 0; i < count; i++)
+            {
+                _componentFunc.Invoke(
+                    ref Unsafe.AsRef<T1>(list1),
+                    ref Unsafe.AsRef<T2>(list2),
+                    ref Unsafe.AsRef<T3>(list3),
+                    ref Unsafe.AsRef<T4>(list4),
+                    ref Unsafe.AsRef<T5>(list5),
+                    ref Unsafe.AsRef<T6>(list6),
+                    _state
                 );
                 list1++;
                 list2++;

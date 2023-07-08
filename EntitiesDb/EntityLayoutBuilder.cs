@@ -1,5 +1,4 @@
 ﻿using EntitiesDb.Components;
-using EntitiesDb.Mapping;
 
 namespace EntitiesDb
 {
@@ -22,8 +21,8 @@ namespace EntitiesDb
 
         public EntityLayout Build()
         {
-            var addArchetype = Archetype.FromIds(_addedIds);
-            var removeArchetype = Archetype.FromIds(_removedIds);
+            var addArchetype = EntityArchetype.FromIds(_addedIds);
+            var removeArchetype = EntityArchetype.FromIds(_removedIds);
             return new EntityLayout(addArchetype, removeArchetype);
         }
 

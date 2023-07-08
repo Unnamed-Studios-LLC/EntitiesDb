@@ -61,6 +61,63 @@ namespace EntitiesDb
             queryFilter.ForEach(func);
         }
 
+        public void ForEach<T1, TState>(TState state, ComponentStateFunc<T1, TState> func)
+            where T1 : unmanaged
+        {
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(state, func);
+        }
+
+        public void ForEach<T1, T2, TState>(TState state, ComponentStateFunc<T1, T2, TState> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+        {
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(state, func);
+        }
+
+        public void ForEach<T1, T2, T3, TState>(TState state, ComponentStateFunc<T1, T2, T3, TState> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+        {
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(state, func);
+        }
+
+        public void ForEach<T1, T2, T3, T4, TState>(TState state, ComponentStateFunc<T1, T2, T3, T4, TState> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+        {
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(state, func);
+        }
+
+        public void ForEach<T1, T2, T3, T4, T5, TState>(TState state, ComponentStateFunc<T1, T2, T3, T4, T5, TState> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+        {
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(state, func);
+        }
+
+        public void ForEach<T1, T2, T3, T4, T5, T6, TState>(TState state, ComponentStateFunc<T1, T2, T3, T4, T5, T6, TState> func)
+            where T1 : unmanaged
+            where T2 : unmanaged
+            where T3 : unmanaged
+            where T4 : unmanaged
+            where T5 : unmanaged
+            where T6 : unmanaged
+        {
+            var queryFilter = new QueryFilter(this);
+            queryFilter.ForEach(state, func);
+        }
+
         public void ForEach<T1>(IdComponentFunc<T1> func)
             where T1 : unmanaged
         {

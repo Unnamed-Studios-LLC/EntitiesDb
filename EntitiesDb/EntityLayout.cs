@@ -1,39 +1,29 @@
 ﻿using EntitiesDb.Components;
-using EntitiesDb.Mapping;
 
 namespace EntitiesDb
 {
     public unsafe class EntityLayout
     {
-        internal readonly Archetype AddArchetype;
-        internal readonly Archetype RemoveArchetype;
+        internal readonly EntityArchetype AddArchetype;
+        internal readonly EntityArchetype RemoveArchetype;
         internal readonly byte[] ComponentData;
         internal readonly ulong[]? HasDataMask;
 
         private readonly Dictionary<int, int> _dataOffsets = new();
 
-        internal EntityLayout(Archetype addArchetype, Archetype removeArchetype)
+        internal EntityLayout(EntityArchetype addArchetype, EntityArchetype removeArchetype)
         {
             AddArchetype = addArchetype;
             RemoveArchetype = removeArchetype;
 
             var dataSize = 0;
-            for (int i = 0; i < addArchetype.Depth; i++)
+            foreach (var componentId in AddArchetype.GetIds())
             {
-                var relIdMask = addArchetype[i];
-                for (int j = 0; j < 64; j++)
-                {
-                    var relId = 1ul << j;
-                    if (relId > relIdMask) break;
-
-                    var componentId = i * 64 + j;
-                    if ((relIdMask & relId) != relId) continue;
-
-                    ref var type = ref ComponentRegistry.GetType(componentId);
-                    _dataOffsets[type.Id] = dataSize;
-                    dataSize += ComponentRegistry.GetType(componentId).Size;
-                }
+                ref var component = ref ComponentRegistry.Get(componentId);
+                _dataOffsets[componentId] = dataSize;
+                dataSize += component.Size;
             }
+
             ComponentData = new byte[dataSize];
             HasDataMask = addArchetype.Depth == 0 ? null : new ulong[addArchetype.Depth];
         }
@@ -46,7 +36,9 @@ namespace EntitiesDb
 
         public void Set<T>(T component) where T : unmanaged
         {
-            var id = ComponentRegistry.Type<T>.Id;
+            var componentType = ComponentRegistry.Get<T>();
+            if (componentType.ZeroSize) return;
+            var id = componentType.Id;
             if (!_dataOffsets.TryGetValue(id, out var offset))
             {
                 throw new Exception($"This layout does not have an Add action for '{typeof(T)}'.");
@@ -65,7 +57,7 @@ namespace EntitiesDb
             HasDataMask[index] |= relMask;
         }
 
-        internal void Apply(Archetype inputArchetype, Archetype resultArchetype)
+        internal void Apply(EntityArchetype inputArchetype, EntityArchetype resultArchetype)
         {
             for (int i = 0; i < resultArchetype.Depth; i++)
             {
@@ -77,7 +69,7 @@ namespace EntitiesDb
             }
         }
 
-        internal int GetDepthResult(Archetype targetArchetype)
+        internal int GetDepthResult(EntityArchetype targetArchetype)
         {
             int depth = targetArchetype.Depth;
             var addDepth = AddArchetype.Depth;

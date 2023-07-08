@@ -1,6 +1,4 @@
-﻿using EntitiesDb.Events;
-
-namespace EntitiesDb
+﻿namespace EntitiesDb
 {
     public unsafe delegate void ComponentHandler<T>(uint entityId, ref T component) where T : unmanaged;
 
