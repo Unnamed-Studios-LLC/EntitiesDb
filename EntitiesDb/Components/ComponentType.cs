@@ -11,6 +11,7 @@
         internal EventPublisher OnRemove;
         internal EntityLayout AddLayout;
         internal EntityLayout RemoveLayout;
+        internal Action Clearer;
 
         public bool ZeroSize => Size == 0;
     }

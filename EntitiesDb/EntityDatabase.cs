@@ -41,6 +41,8 @@ namespace EntitiesDb
             PrePopulateCaches();
         }
 
+        public static void ClearComponentRegistry() => ComponentRegistry.Clear();
+
         public unsafe ref T AddComponent<T>(uint entityId, T data = default) where T : unmanaged
         {
             ref var component = ref ComponentRegistry.Get<T>();

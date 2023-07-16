@@ -8,15 +8,15 @@ namespace EntitiesDb.Components
         {
             static Type()
             {
-                Id = GetId();
                 ref var component = ref _components[Id];
                 component.AddLayout = EntityLayoutBuilder.Create().Add<T>().Build();
                 component.RemoveLayout = EntityLayoutBuilder.Create().Remove<T>().Build();
             }
 
             private static int? _id;
-            public static int Id;
             public static bool ZeroSize = typeof(T).IsZeroSize();
+
+            public static int Id => _id ?? GetId();
 
             private static int GetId()
             {
@@ -46,6 +46,10 @@ namespace EntitiesDb.Components
                                 if (ZeroSize) return;
                                 ref var component = ref database.GetComponent<T>(id);
                                 component = (T)value;
+                            },
+                            Clearer = () =>
+                            {
+                                _id = null;
                             }
                         };
                         _id = id;
@@ -62,6 +66,20 @@ namespace EntitiesDb.Components
         private static int s_nextId = 1;
 
         public static int Count => s_nextId;
+
+        public static void Clear()
+        {
+            lock (s_lock)
+            {
+                for (int i = 1; i < s_nextId - 1; i++)
+                {
+                    _components[i].Clearer();
+                }
+                _components = new ComponentType[64];
+                _componentMap.Clear();
+                s_nextId = 1;
+            }
+        }
 
         public static ref ComponentType Get(int componentId) => ref _components[componentId];
         public static ref ComponentType Get(Type type) => ref _components[_componentMap[type]];
