@@ -1,13 +1,11 @@
-﻿using EntitiesDb.Components;
-
-namespace EntitiesDb.Data
+﻿namespace EntitiesDb.Data
 {
     internal partial class EntityGroup
     {
         public void GetComponentListIndex<T0>(Span<int> results)
             where T0 : unmanaged
         {
-            var id0 = ComponentRegistry.Type<T0>.Id;
+            var id0 = _componentRegistry.Get<T0>().Id;
             results[0] = -1;
             for (int i = 0; i < ComponentIds.Length; i++)
             {
@@ -23,8 +21,8 @@ namespace EntitiesDb.Data
             where T0 : unmanaged
             where T1 : unmanaged
         {
-            var id0 = ComponentRegistry.Type<T0>.Id;
-            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id0 = _componentRegistry.Get<T0>().Id;
+            var id1 = _componentRegistry.Get<T1>().Id;
             results[0] = -1;
             results[1] = -1;
             for (int i = 0; i < ComponentIds.Length; i++)
@@ -46,9 +44,9 @@ namespace EntitiesDb.Data
             where T1 : unmanaged
             where T2 : unmanaged
         {
-            var id0 = ComponentRegistry.Type<T0>.Id;
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id0 = _componentRegistry.Get<T0>().Id;
+            var id1 = _componentRegistry.Get<T1>().Id;
+            var id2 = _componentRegistry.Get<T2>().Id;
             results[0] = -1;
             results[1] = -1;
             results[2] = -1;
@@ -76,10 +74,10 @@ namespace EntitiesDb.Data
             where T2 : unmanaged
             where T3 : unmanaged
         {
-            var id0 = ComponentRegistry.Type<T0>.Id;
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id0 = _componentRegistry.Get<T0>().Id;
+            var id1 = _componentRegistry.Get<T1>().Id;
+            var id2 = _componentRegistry.Get<T2>().Id;
+            var id3 = _componentRegistry.Get<T3>().Id;
             results[0] = -1;
             results[1] = -1;
             results[2] = -1;
@@ -113,11 +111,11 @@ namespace EntitiesDb.Data
             where T3 : unmanaged
             where T4 : unmanaged
         {
-            var id0 = ComponentRegistry.Type<T0>.Id;
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
+            var id0 = _componentRegistry.Get<T0>().Id;
+            var id1 = _componentRegistry.Get<T1>().Id;
+            var id2 = _componentRegistry.Get<T2>().Id;
+            var id3 = _componentRegistry.Get<T3>().Id;
+            var id4 = _componentRegistry.Get<T4>().Id;
             results[0] = -1;
             results[1] = -1;
             results[2] = -1;
@@ -157,12 +155,12 @@ namespace EntitiesDb.Data
             where T4 : unmanaged
             where T5 : unmanaged
         {
-            var id0 = ComponentRegistry.Type<T0>.Id;
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
-            var id5 = ComponentRegistry.Type<T5>.Id;
+            var id0 = _componentRegistry.Get<T0>().Id;
+            var id1 = _componentRegistry.Get<T1>().Id;
+            var id2 = _componentRegistry.Get<T2>().Id;
+            var id3 = _componentRegistry.Get<T3>().Id;
+            var id4 = _componentRegistry.Get<T4>().Id;
+            var id5 = _componentRegistry.Get<T5>().Id;
             results[0] = -1;
             results[1] = -1;
             results[2] = -1;

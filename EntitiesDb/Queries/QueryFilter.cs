@@ -17,13 +17,13 @@ namespace EntitiesDb.Queries
             NoFilter = default;
             WithFilter = default;
             _entityDatabase = entityDatabase;
-            AddtoFilter(ref NoFilter, ComponentRegistry.Type<Disabled>.Id);
+            AddtoFilter(ref NoFilter, _entityDatabase.ComponentRegistry.Get<Disabled>().Id);
         }
 
         public QueryFilter Any<T1>()
             where T1 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
             AddtoFilter(ref AnyFilter, id1);
             return this;
         }
@@ -32,8 +32,8 @@ namespace EntitiesDb.Queries
             where T1 : unmanaged
             where T2 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
             AddtoFilter(ref AnyFilter, id1);
             AddtoFilter(ref AnyFilter, id2);
             return this;
@@ -44,9 +44,9 @@ namespace EntitiesDb.Queries
             where T2 : unmanaged
             where T3 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
             AddtoFilter(ref AnyFilter, id1);
             AddtoFilter(ref AnyFilter, id2);
             AddtoFilter(ref AnyFilter, id3);
@@ -59,10 +59,10 @@ namespace EntitiesDb.Queries
             where T3 : unmanaged
             where T4 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
+            var id4 = _entityDatabase.ComponentRegistry.Get<T4>().Id;
             AddtoFilter(ref AnyFilter, id1);
             AddtoFilter(ref AnyFilter, id2);
             AddtoFilter(ref AnyFilter, id3);
@@ -77,11 +77,11 @@ namespace EntitiesDb.Queries
             where T4 : unmanaged
             where T5 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
-            var id5 = ComponentRegistry.Type<T5>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
+            var id4 = _entityDatabase.ComponentRegistry.Get<T4>().Id;
+            var id5 = _entityDatabase.ComponentRegistry.Get<T5>().Id;
             AddtoFilter(ref AnyFilter, id1);
             AddtoFilter(ref AnyFilter, id2);
             AddtoFilter(ref AnyFilter, id3);
@@ -98,12 +98,12 @@ namespace EntitiesDb.Queries
             where T5 : unmanaged
             where T6 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
-            var id5 = ComponentRegistry.Type<T5>.Id;
-            var id6 = ComponentRegistry.Type<T6>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
+            var id4 = _entityDatabase.ComponentRegistry.Get<T4>().Id;
+            var id5 = _entityDatabase.ComponentRegistry.Get<T5>().Id;
+            var id6 = _entityDatabase.ComponentRegistry.Get<T6>().Id;
             AddtoFilter(ref AnyFilter, id1);
             AddtoFilter(ref AnyFilter, id2);
             AddtoFilter(ref AnyFilter, id3);
@@ -115,7 +115,7 @@ namespace EntitiesDb.Queries
 
         public QueryFilter IncludeDisabled()
         {
-            var disabledId = ComponentRegistry.Type<Disabled>.Id;
+            var disabledId = _entityDatabase.ComponentRegistry.Get<Disabled>().Id;
             RemoveFromFilter(ref NoFilter, disabledId);
             return this;
         }
@@ -123,7 +123,7 @@ namespace EntitiesDb.Queries
         public QueryFilter No<T1>()
             where T1 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
             AddtoFilter(ref NoFilter, id1);
             return this;
         }
@@ -132,8 +132,8 @@ namespace EntitiesDb.Queries
             where T1 : unmanaged
             where T2 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
             AddtoFilter(ref NoFilter, id1);
             AddtoFilter(ref NoFilter, id2);
             return this;
@@ -144,9 +144,9 @@ namespace EntitiesDb.Queries
             where T2 : unmanaged
             where T3 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
             AddtoFilter(ref NoFilter, id1);
             AddtoFilter(ref NoFilter, id2);
             AddtoFilter(ref NoFilter, id3);
@@ -159,10 +159,10 @@ namespace EntitiesDb.Queries
             where T3 : unmanaged
             where T4 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
+            var id4 = _entityDatabase.ComponentRegistry.Get<T4>().Id;
             AddtoFilter(ref NoFilter, id1);
             AddtoFilter(ref NoFilter, id2);
             AddtoFilter(ref NoFilter, id3);
@@ -177,11 +177,11 @@ namespace EntitiesDb.Queries
             where T4 : unmanaged
             where T5 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
-            var id5 = ComponentRegistry.Type<T5>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
+            var id4 = _entityDatabase.ComponentRegistry.Get<T4>().Id;
+            var id5 = _entityDatabase.ComponentRegistry.Get<T5>().Id;
             AddtoFilter(ref NoFilter, id1);
             AddtoFilter(ref NoFilter, id2);
             AddtoFilter(ref NoFilter, id3);
@@ -198,12 +198,12 @@ namespace EntitiesDb.Queries
             where T5 : unmanaged
             where T6 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
-            var id5 = ComponentRegistry.Type<T5>.Id;
-            var id6 = ComponentRegistry.Type<T6>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
+            var id4 = _entityDatabase.ComponentRegistry.Get<T4>().Id;
+            var id5 = _entityDatabase.ComponentRegistry.Get<T5>().Id;
+            var id6 = _entityDatabase.ComponentRegistry.Get<T6>().Id;
             AddtoFilter(ref NoFilter, id1);
             AddtoFilter(ref NoFilter, id2);
             AddtoFilter(ref NoFilter, id3);
@@ -216,7 +216,7 @@ namespace EntitiesDb.Queries
         public QueryFilter With<T1>()
             where T1 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
             AddtoFilter(ref WithFilter, id1);
             return this;
         }
@@ -225,8 +225,8 @@ namespace EntitiesDb.Queries
             where T1 : unmanaged
             where T2 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
             AddtoFilter(ref WithFilter, id1);
             AddtoFilter(ref WithFilter, id2);
             return this;
@@ -237,9 +237,9 @@ namespace EntitiesDb.Queries
             where T2 : unmanaged
             where T3 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
             AddtoFilter(ref WithFilter, id1);
             AddtoFilter(ref WithFilter, id2);
             AddtoFilter(ref WithFilter, id3);
@@ -252,10 +252,10 @@ namespace EntitiesDb.Queries
             where T3 : unmanaged
             where T4 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
+            var id4 = _entityDatabase.ComponentRegistry.Get<T4>().Id;
             AddtoFilter(ref WithFilter, id1);
             AddtoFilter(ref WithFilter, id2);
             AddtoFilter(ref WithFilter, id3);
@@ -270,11 +270,11 @@ namespace EntitiesDb.Queries
             where T4 : unmanaged
             where T5 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
-            var id5 = ComponentRegistry.Type<T5>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
+            var id4 = _entityDatabase.ComponentRegistry.Get<T4>().Id;
+            var id5 = _entityDatabase.ComponentRegistry.Get<T5>().Id;
             AddtoFilter(ref WithFilter, id1);
             AddtoFilter(ref WithFilter, id2);
             AddtoFilter(ref WithFilter, id3);
@@ -291,12 +291,12 @@ namespace EntitiesDb.Queries
             where T5 : unmanaged
             where T6 : unmanaged
         {
-            var id1 = ComponentRegistry.Type<T1>.Id;
-            var id2 = ComponentRegistry.Type<T2>.Id;
-            var id3 = ComponentRegistry.Type<T3>.Id;
-            var id4 = ComponentRegistry.Type<T4>.Id;
-            var id5 = ComponentRegistry.Type<T5>.Id;
-            var id6 = ComponentRegistry.Type<T6>.Id;
+            var id1 = _entityDatabase.ComponentRegistry.Get<T1>().Id;
+            var id2 = _entityDatabase.ComponentRegistry.Get<T2>().Id;
+            var id3 = _entityDatabase.ComponentRegistry.Get<T3>().Id;
+            var id4 = _entityDatabase.ComponentRegistry.Get<T4>().Id;
+            var id5 = _entityDatabase.ComponentRegistry.Get<T5>().Id;
+            var id6 = _entityDatabase.ComponentRegistry.Get<T6>().Id;
             AddtoFilter(ref WithFilter, id1);
             AddtoFilter(ref WithFilter, id2);
             AddtoFilter(ref WithFilter, id3);
@@ -960,7 +960,7 @@ namespace EntitiesDb.Queries
 
         private static void ZeroCheck<T1>() where T1 : unmanaged
         {
-            if (ComponentRegistry.Type<T1>.ZeroSize) throw new Exception($"Zero-size components cannot be iterated!");
+            if (_entityDatabase.ComponentRegistry.Get<T1>.ZeroSize) throw new Exception($"Zero-size components cannot be iterated!");
         }
     }
 }

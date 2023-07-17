@@ -10,19 +10,21 @@ namespace EntitiesDb.Data
 
         public readonly EntityArchetype Archetype;
 
+        private readonly ComponentRegistry _componentRegistry;
         private readonly List<EntityChunk> _chunks = new();
         private readonly Dictionary<int, int> _idMap = new();
         private readonly int _chunkCapacity;
         private int _workingChunkCount;
         private bool _disposedValue;
 
-        public EntityGroup(EntityArchetype archetype)
+        public EntityGroup(EntityArchetype archetype, ComponentRegistry componentRegistry)
         {
             Archetype = archetype;
+            _componentRegistry = componentRegistry;
 
             var componentIds = archetype.GetNonZeroIds().ToArray();
             var listOffsets = new int[componentIds.Length];
-            var chunkCapacity = GetChunkCapacity(componentIds);
+            var chunkCapacity = GetChunkCapacity(componentIds, componentRegistry);
 
             int offset = sizeof(uint) * chunkCapacity;
             for (int i = 0; i < componentIds.Length; i++)
@@ -30,7 +32,7 @@ namespace EntitiesDb.Data
                 var id = componentIds[i];
                 _idMap[id] = i;
                 listOffsets[i] = offset;
-                var componentSize = ComponentRegistry.Get(id).Size;
+                var componentSize = _componentRegistry.Get(id).MetaData.Size;
                 offset += componentSize * chunkCapacity;
             }
 
@@ -94,7 +96,7 @@ namespace EntitiesDb.Data
         }
         public unsafe ref T GetComponent<T>(EntityChunk chunk, int listIndex) where T : unmanaged
         {
-            var id = ComponentRegistry.Type<T>.Id;
+            var id = _componentRegistry.Get<T>().Id;
             if (!Archetype.Contains(id))
             {
                 throw new Exception($"Component of type '{typeof(T)}' not found in entity.");
@@ -128,7 +130,7 @@ namespace EntitiesDb.Data
                 remappedEntityId = chunk.EntityIds[index.List] = chunk.EntityIds[lastListIndex]; // remap entityId
                 for (int i = 0; i < ComponentIds.Length; i++)
                 {
-                    var componentSize = ComponentRegistry.Get(ComponentIds[i]).Size;
+                    var componentSize = _componentRegistry.Get(ComponentIds[i]).MetaData.Size;
                     var sourcePtr = lastChunk.GetComponent(ListOffsets[i], componentSize, lastListIndex);
                     var destinationPtr = chunk.GetComponent(ListOffsets[i], componentSize, index.List);
                     Buffer.MemoryCopy(sourcePtr, destinationPtr, componentSize, componentSize);
@@ -154,7 +156,7 @@ namespace EntitiesDb.Data
         }
         public unsafe ref T TryGetComponent<T>(EntityChunk chunk, int listIndex, out bool found) where T : unmanaged
         {
-            var id = ComponentRegistry.Type<T>.Id;
+            var id = _componentRegistry.Get<T>().Id;
             if (!Archetype.Contains(id))
             {
                 found = false;
@@ -188,12 +190,12 @@ namespace EntitiesDb.Data
             return new EntityChunk(ptr.ToPointer());
         }
 
-        private static int GetChunkCapacity(int[] componentIds)
+        private static int GetChunkCapacity(int[] componentIds, ComponentRegistry componentRegistry)
         {
             var lineSize = sizeof(uint); // entityId
             for (int i = 0; i < componentIds.Length; i++)
             {
-                lineSize += ComponentRegistry.Get(componentIds[i]).Size;
+                lineSize += componentRegistry.Get(componentIds[i]).MetaData.Size;
             }
 
             var lines = ChunkAllocSize / lineSize;

@@ -1,60 +1,30 @@
-﻿using EntitiesDb.Components;
-
-namespace EntitiesDb
+﻿namespace EntitiesDb
 {
     public unsafe class EntityLayout
     {
-        internal readonly EntityArchetype AddArchetype;
-        internal readonly EntityArchetype RemoveArchetype;
-        internal readonly byte[] ComponentData;
-        internal readonly ulong[]? HasDataMask;
-
-        private readonly Dictionary<int, int> _dataOffsets = new();
-
-        internal EntityLayout(EntityArchetype addArchetype, EntityArchetype removeArchetype)
-        {
-            AddArchetype = addArchetype;
-            RemoveArchetype = removeArchetype;
-
-            var dataSize = 0;
-            foreach (var componentId in AddArchetype.GetIds())
-            {
-                ref var component = ref ComponentRegistry.Get(componentId);
-                _dataOffsets[componentId] = dataSize;
-                dataSize += component.Size;
-            }
-
-            ComponentData = new byte[dataSize];
-            HasDataMask = addArchetype.Depth == 0 ? null : new ulong[addArchetype.Depth];
-        }
+        internal readonly Dictionary<Type, object> Added = new();
+        internal readonly HashSet<Type> Removed = new();
 
         public void Clear()
         {
-            if (HasDataMask == null) return;
-            for (int i = 0; i < HasDataMask.Length; i++) HasDataMask[i] = 0;
+            Added.Clear();
+            Removed.Clear();
         }
 
-        public void Set<T>(T component) where T : unmanaged
+        public EntityLayout Add<T>(T component = default) where T : unmanaged
         {
-            var componentType = ComponentRegistry.Get<T>();
-            if (componentType.ZeroSize) return;
-            var id = componentType.Id;
-            if (!_dataOffsets.TryGetValue(id, out var offset))
-            {
-                throw new Exception($"This layout does not have an Add action for '{typeof(T)}'.");
-            }
+            var type = typeof(T);
+            Added[type] = component;
+            Removed.Remove(type);
+            return this;
+        }
 
-            fixed (byte* ptr = ComponentData)
-            {
-                var destination = (T*)(ptr + offset);
-                *destination = component;
-            }
-
-            if (HasDataMask == null) return;
-
-            var index = id / 64;
-            var relMask = 1ul << (id % 64);
-            HasDataMask[index] |= relMask;
+        public EntityLayout Remove<T>() where T : unmanaged
+        {
+            var type = typeof(T);
+            Added.Remove(type);
+            Removed.Add(type);
+            return this;
         }
 
         internal void Apply(EntityArchetype inputArchetype, EntityArchetype resultArchetype)
