@@ -1,11 +1,10 @@
-﻿using EntitiesDb.Data;
+﻿using System.Collections.Generic;
 
-namespace EntitiesDb.Queries
+namespace EntitiesDb
 {
     internal interface IQuery
     {
-        void CopyIndices(EntityGroup group, Span<int> indices);
-        void EnumerateChunk(in EnumerationJob job, Span<int> indices);
-        IEnumerable<int> GetRequiredIds();
+        void EnumerateChunk(in EnumerationJob job);
+        IEnumerable<ComponentMetaData> GetDelegateMetaData();
     }
 }

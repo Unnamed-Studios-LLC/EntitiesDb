@@ -1,15 +1,13 @@
-﻿using EntitiesDb.Data;
-
-namespace EntitiesDb.Queries
+﻿namespace EntitiesDb
 {
     internal readonly struct EnumerationJob
     {
-        public readonly EntityGroup Group;
+        public readonly Archetype Archetype;
         public readonly int ChunkIndex;
 
-        public EnumerationJob(EntityGroup group, int chunkIndex)
+        public EnumerationJob(Archetype archetype, int chunkIndex)
         {
-            Group = group;
+            Archetype = archetype;
             ChunkIndex = chunkIndex;
         }
     }

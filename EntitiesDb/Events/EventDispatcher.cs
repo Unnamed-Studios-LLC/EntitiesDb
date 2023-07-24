@@ -1,71 +1,87 @@
-﻿using EntitiesDb.Events;
-using System.Runtime.InteropServices;
-using EntitiesDb.Components;
+﻿using System;
+using System.Collections.Generic;
 
-namespace EntitiesDb.Events
+namespace EntitiesDb
 {
-    internal sealed class EventDispatcher
+	public sealed class EventDispatcher
     {
-        private readonly Dictionary<int, EventSubscription> _subscriptions = new();
+        public event EntityHandler OnAdd;
+        public event EntityHandler OnRemove;
+
+        private readonly Dictionary<Type, ComponentEvents> _componentEvents = new();
 
         public void Clear()
         {
-            _subscriptions.Clear();
+            OnAdd = null;
+            OnRemove = null;
+            _componentEvents.Clear();
         }
 
-        public void PublishAdd<T>(uint entityId, ref T component) where T : unmanaged
+        public void OnAddComponent<T>(uint entityId, ref T component) where T : unmanaged
         {
-            if (!_subscriptions.TryGetValue(ComponentRegistry.Type<T>.Id, out var subscription) ||
-                subscription is not EventSubscription<T> componentSubscription) return;
-            componentSubscription.PublishOnAdd(entityId, ref component);
+            if (!_componentEvents.TryGetValue(typeof(T), out var events) ||
+                events is not ComponentEvents<T> typedEvents) return;
+            typedEvents.OnAddComponent(entityId, ref component);
         }
 
-        public void PublishRemove<T>(uint entityId, ref T component) where T : unmanaged
+        public void OnAddEntity(uint entityId)
         {
-            if (!_subscriptions.TryGetValue(ComponentRegistry.Type<T>.Id, out var subscription) ||
-                subscription is not EventSubscription<T> componentSubscription) return;
-            componentSubscription.PublishOnRemove(entityId, ref component);
+            OnAdd?.Invoke(entityId);
         }
 
-        public void SubscribeOnAdd<T>(ComponentHandler<T> handler) where T : unmanaged
+        public void OnRemoveComponent<T>(uint entityId, ref T component) where T : unmanaged
         {
-            if (handler is null) throw new ArgumentNullException(nameof(handler));
-            var subscription = GetSubscription<T>();
-            subscription.OnAdd += handler;
+            if (!_componentEvents.TryGetValue(typeof(T), out var events) ||
+                events is not ComponentEvents<T> typedEvents) return;
+            typedEvents.OnRemoveComponent(entityId, ref component);
         }
 
-        public void SubscribeOnRemove<T>(ComponentHandler<T> handler) where T : unmanaged
+        public void OnRemoveEntity(uint entityId)
         {
-            if (handler is null) throw new ArgumentNullException(nameof(handler));
-            var subscription = GetSubscription<T>();
-            subscription.OnRemove += handler;
+            OnRemove?.Invoke(entityId);
         }
 
-        public void UnsubscribeOnAdd<T>(ComponentHandler<T> handler) where T : unmanaged
+        public void AddComponentEvent<T>(EventAction eventAction, ComponentHandler<T> handler) where T : unmanaged
         {
             if (handler is null) throw new ArgumentNullException(nameof(handler));
-            var subscription = GetSubscription<T>();
-            subscription.OnAdd -= handler;
-        }
-
-        public void UnsubscribeOnRemove<T>(ComponentHandler<T> handler) where T : unmanaged
-        {
-            if (handler is null) throw new ArgumentNullException(nameof(handler));
-            var subscription = GetSubscription<T>();
-            subscription.OnRemove -= handler;
-        }
-
-        private EventSubscription<T> GetSubscription<T>() where T : unmanaged
-        {
-            EventSubscription<T> componentSubscription;
-            ref var subscription = ref CollectionsMarshal.GetValueRefOrAddDefault(_subscriptions, ComponentRegistry.Type<T>.Id, out var exists);
-            if (!exists)
+            var componentEvents = GetComponentEvents<T>();
+            switch (eventAction)
             {
-                componentSubscription = new EventSubscription<T>();
-                subscription = componentSubscription;
+                case EventAction.Add:
+                    componentEvents.OnAdd += handler;
+                    break;
+                case EventAction.Remove:
+                    componentEvents.OnRemove += handler;
+                    break;
             }
-            else componentSubscription = (EventSubscription<T>)subscription!;
-            return componentSubscription;
+        }
+
+        public void RemoveComponentEvent<T>(EventAction eventAction, ComponentHandler<T> handler) where T : unmanaged
+        {
+            if (handler is null) throw new ArgumentNullException(nameof(handler));
+            var componentEvents = GetComponentEvents<T>();
+            switch (eventAction)
+            {
+                case EventAction.Add:
+                    componentEvents.OnAdd -= handler;
+                    break;
+                case EventAction.Remove:
+                    componentEvents.OnRemove -= handler;
+                    break;
+            }
+        }
+
+        private ComponentEvents<T> GetComponentEvents<T>() where T : unmanaged
+        {
+            if (_componentEvents.TryGetValue(typeof(T), out var events))
+            {
+                return (ComponentEvents<T>)events;
+            }
+
+            var typedEvents = new ComponentEvents<T>();
+            _componentEvents.Add(typeof(T), typedEvents);
+            return typedEvents;
         }
     }
 }
+
