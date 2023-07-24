@@ -1,4 +1,5 @@
 ﻿namespace EntitiesDb
 {
-    public struct Disabled { }
+	public struct Disabled { }
 }
+

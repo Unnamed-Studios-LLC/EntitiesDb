@@ -1,61 +1,53 @@
-﻿namespace EntitiesDb
+﻿using System;
+
+namespace EntitiesDb
 {
     public partial class EntityDatabase
     {
-        public void Subscribe<T>(Event @event, ComponentHandler<T> handler) where T : unmanaged
+        public void AddComponentEvent<T>(EventAction eventAction, ComponentHandler<T> handler) where T : unmanaged
         {
-            ThrowIfStructuralChangeBlocked();
-            switch (@event)
+            _eventDispatcher.AddComponentEvent(eventAction, handler);
+        }
+
+        public void AddEntityEvent(EventAction eventAction, EntityHandler handler)
+        {
+            if (handler is null)
             {
-                case Event.OnAdd:
-                    _eventDispatcher.SubscribeOnAdd(handler);
+                throw new ArgumentNullException(nameof(handler));
+            }
+
+            switch (eventAction)
+            {
+                case EventAction.Add:
+                    _eventDispatcher.OnAdd += handler;
                     break;
-                case Event.OnRemove:
-                    _eventDispatcher.SubscribeOnRemove(handler);
+                case EventAction.Remove:
+                    _eventDispatcher.OnRemove += handler;
                     break;
             }
         }
 
-        public void Unsubscribe<T>(Event @event, ComponentHandler<T> handler) where T : unmanaged
+        public void RemoveComponentEvent<T>(EventAction eventAction, ComponentHandler<T> handler) where T : unmanaged
         {
-            ThrowIfStructuralChangeBlocked();
-            switch (@event)
-            {
-                case Event.OnAdd:
-                    _eventDispatcher.UnsubscribeOnAdd(handler);
-                    break;
-                case Event.OnRemove:
-                    _eventDispatcher.UnsubscribeOnRemove(handler);
-                    break;
-            }
+            _eventDispatcher.RemoveComponentEvent(eventAction, handler);
         }
 
-        internal void PublishAddEvent<T>(uint entityId, ref T component) where T : unmanaged
+        public void RemoveEntityEvent(EventAction eventAction, EntityHandler handler)
         {
-            _inEvent = true;
-            try
+            if (handler is null)
             {
-                _eventDispatcher.PublishAdd(entityId, ref component);
+                throw new ArgumentNullException(nameof(handler));
             }
-            catch (Exception e)
-            {
-                _eventExceptions.Add(e);
-            }
-            _inEvent = false;
-        }
 
-        internal void PublishRemoveEvent<T>(uint entityId, ref T component) where T : unmanaged
-        {
-            _inEvent = true;
-            try
+            switch (eventAction)
             {
-                _eventDispatcher.PublishRemove(entityId, ref component);
+                case EventAction.Add:
+                    _eventDispatcher.OnAdd -= handler;
+                    break;
+                case EventAction.Remove:
+                    _eventDispatcher.OnRemove -= handler;
+                    break;
             }
-            catch (Exception e)
-            {
-                _eventExceptions.Add(e);
-            }
-            _inEvent = false;
         }
     }
 }

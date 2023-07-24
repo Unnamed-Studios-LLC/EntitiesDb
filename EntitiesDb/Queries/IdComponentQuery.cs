@@ -1,8 +1,8 @@
-﻿using System.Runtime.CompilerServices;
-using EntitiesDb.Components;
-using EntitiesDb.Data;
+﻿using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
-namespace EntitiesDb.Queries
+namespace EntitiesDb
 {
     internal unsafe struct IdComponentQuery : IQuery
     {
@@ -13,13 +13,11 @@ namespace EntitiesDb.Queries
             _idComponentFunc = idComponentFunc;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) { }
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -29,7 +27,7 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds() => Enumerable.Empty<int>();
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData() => Array.Empty<ComponentMetaData>();
     }
 
     internal unsafe struct IdComponentQuery<T1> : IQuery
@@ -42,15 +40,12 @@ namespace EntitiesDb.Queries
             _idComponentFunc = idComponentFunc;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -62,9 +57,9 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
+            yield return ComponentMetaData<T1>.Instance;
         }
     }
 
@@ -79,16 +74,13 @@ namespace EntitiesDb.Queries
             _idComponentFunc = idComponentFunc;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1, T2>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
-            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var list2 = chunk.GetList<T2>(job.Archetype.GetListOffset(typeof(T2)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -102,10 +94,10 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
-            yield return ComponentRegistry.Type<T2>.Id;
+            yield return ComponentMetaData<T1>.Instance;
+            yield return ComponentMetaData<T2>.Instance;
         }
     }
 
@@ -121,17 +113,14 @@ namespace EntitiesDb.Queries
             _idComponentFunc = idComponentFunc;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1, T2, T3>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
-            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
-            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var list2 = chunk.GetList<T2>(job.Archetype.GetListOffset(typeof(T2)));
+            var list3 = chunk.GetList<T3>(job.Archetype.GetListOffset(typeof(T3)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -147,11 +136,11 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
-            yield return ComponentRegistry.Type<T2>.Id;
-            yield return ComponentRegistry.Type<T3>.Id;
+            yield return ComponentMetaData<T1>.Instance;
+            yield return ComponentMetaData<T2>.Instance;
+            yield return ComponentMetaData<T3>.Instance;
         }
     }
 
@@ -168,18 +157,15 @@ namespace EntitiesDb.Queries
             _idComponentFunc = idComponentFunc;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1, T2, T3, T4>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
-            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
-            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
-            var list4 = chunk.GetList<T4>(job.Group.ListOffsets[indices[3]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var list2 = chunk.GetList<T2>(job.Archetype.GetListOffset(typeof(T2)));
+            var list3 = chunk.GetList<T3>(job.Archetype.GetListOffset(typeof(T3)));
+            var list4 = chunk.GetList<T4>(job.Archetype.GetListOffset(typeof(T4)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -197,12 +183,12 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
-            yield return ComponentRegistry.Type<T2>.Id;
-            yield return ComponentRegistry.Type<T3>.Id;
-            yield return ComponentRegistry.Type<T4>.Id;
+            yield return ComponentMetaData<T1>.Instance;
+            yield return ComponentMetaData<T2>.Instance;
+            yield return ComponentMetaData<T3>.Instance;
+            yield return ComponentMetaData<T4>.Instance;
         }
     }
 
@@ -220,19 +206,16 @@ namespace EntitiesDb.Queries
             _idComponentFunc = idComponentFunc;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1, T2, T3, T4, T5>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
-            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
-            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
-            var list4 = chunk.GetList<T4>(job.Group.ListOffsets[indices[3]]);
-            var list5 = chunk.GetList<T5>(job.Group.ListOffsets[indices[4]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var list2 = chunk.GetList<T2>(job.Archetype.GetListOffset(typeof(T2)));
+            var list3 = chunk.GetList<T3>(job.Archetype.GetListOffset(typeof(T3)));
+            var list4 = chunk.GetList<T4>(job.Archetype.GetListOffset(typeof(T4)));
+            var list5 = chunk.GetList<T5>(job.Archetype.GetListOffset(typeof(T5)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -252,13 +235,13 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
-            yield return ComponentRegistry.Type<T2>.Id;
-            yield return ComponentRegistry.Type<T3>.Id;
-            yield return ComponentRegistry.Type<T4>.Id;
-            yield return ComponentRegistry.Type<T5>.Id;
+            yield return ComponentMetaData<T1>.Instance;
+            yield return ComponentMetaData<T2>.Instance;
+            yield return ComponentMetaData<T3>.Instance;
+            yield return ComponentMetaData<T4>.Instance;
+            yield return ComponentMetaData<T5>.Instance;
         }
     }
 
@@ -277,20 +260,17 @@ namespace EntitiesDb.Queries
             _idComponentFunc = idComponentFunc;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1, T2, T3, T4, T5, T6>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
-            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
-            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
-            var list4 = chunk.GetList<T4>(job.Group.ListOffsets[indices[3]]);
-            var list5 = chunk.GetList<T5>(job.Group.ListOffsets[indices[4]]);
-            var list6 = chunk.GetList<T6>(job.Group.ListOffsets[indices[5]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var list2 = chunk.GetList<T2>(job.Archetype.GetListOffset(typeof(T2)));
+            var list3 = chunk.GetList<T3>(job.Archetype.GetListOffset(typeof(T3)));
+            var list4 = chunk.GetList<T4>(job.Archetype.GetListOffset(typeof(T4)));
+            var list5 = chunk.GetList<T5>(job.Archetype.GetListOffset(typeof(T5)));
+            var list6 = chunk.GetList<T6>(job.Archetype.GetListOffset(typeof(T6)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -312,14 +292,14 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
-            yield return ComponentRegistry.Type<T2>.Id;
-            yield return ComponentRegistry.Type<T3>.Id;
-            yield return ComponentRegistry.Type<T4>.Id;
-            yield return ComponentRegistry.Type<T5>.Id;
-            yield return ComponentRegistry.Type<T6>.Id;
+            yield return ComponentMetaData<T1>.Instance;
+            yield return ComponentMetaData<T2>.Instance;
+            yield return ComponentMetaData<T3>.Instance;
+            yield return ComponentMetaData<T4>.Instance;
+            yield return ComponentMetaData<T5>.Instance;
+            yield return ComponentMetaData<T6>.Instance;
         }
     }
 
@@ -334,13 +314,11 @@ namespace EntitiesDb.Queries
             _state = state;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) { }
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -351,7 +329,7 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds() => Enumerable.Empty<int>();
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData() => Array.Empty<ComponentMetaData>();
     }
 
     internal unsafe struct IdComponentStateQuery<T1, TState> : IQuery
@@ -366,15 +344,12 @@ namespace EntitiesDb.Queries
             _state = state;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -387,9 +362,9 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
+            yield return ComponentMetaData<T1>.Instance;
         }
     }
 
@@ -406,16 +381,13 @@ namespace EntitiesDb.Queries
             _state = state;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1, T2>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
-            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var list2 = chunk.GetList<T2>(job.Archetype.GetListOffset(typeof(T2)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -430,10 +402,10 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
-            yield return ComponentRegistry.Type<T2>.Id;
+            yield return ComponentMetaData<T1>.Instance;
+            yield return ComponentMetaData<T2>.Instance;
         }
     }
 
@@ -451,17 +423,14 @@ namespace EntitiesDb.Queries
             _state = state;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1, T2, T3>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
-            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
-            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var list2 = chunk.GetList<T2>(job.Archetype.GetListOffset(typeof(T2)));
+            var list3 = chunk.GetList<T3>(job.Archetype.GetListOffset(typeof(T3)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -478,11 +447,11 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
-            yield return ComponentRegistry.Type<T2>.Id;
-            yield return ComponentRegistry.Type<T3>.Id;
+            yield return ComponentMetaData<T1>.Instance;
+            yield return ComponentMetaData<T2>.Instance;
+            yield return ComponentMetaData<T3>.Instance;
         }
     }
 
@@ -501,18 +470,15 @@ namespace EntitiesDb.Queries
             _state = state;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1, T2, T3, T4>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
-            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
-            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
-            var list4 = chunk.GetList<T4>(job.Group.ListOffsets[indices[3]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var list2 = chunk.GetList<T2>(job.Archetype.GetListOffset(typeof(T2)));
+            var list3 = chunk.GetList<T3>(job.Archetype.GetListOffset(typeof(T3)));
+            var list4 = chunk.GetList<T4>(job.Archetype.GetListOffset(typeof(T4)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -531,12 +497,12 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
-            yield return ComponentRegistry.Type<T2>.Id;
-            yield return ComponentRegistry.Type<T3>.Id;
-            yield return ComponentRegistry.Type<T4>.Id;
+            yield return ComponentMetaData<T1>.Instance;
+            yield return ComponentMetaData<T2>.Instance;
+            yield return ComponentMetaData<T3>.Instance;
+            yield return ComponentMetaData<T4>.Instance;
         }
     }
 
@@ -556,19 +522,16 @@ namespace EntitiesDb.Queries
             _state = state;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1, T2, T3, T4, T5>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
-            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
-            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
-            var list4 = chunk.GetList<T4>(job.Group.ListOffsets[indices[3]]);
-            var list5 = chunk.GetList<T5>(job.Group.ListOffsets[indices[4]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var list2 = chunk.GetList<T2>(job.Archetype.GetListOffset(typeof(T2)));
+            var list3 = chunk.GetList<T3>(job.Archetype.GetListOffset(typeof(T3)));
+            var list4 = chunk.GetList<T4>(job.Archetype.GetListOffset(typeof(T4)));
+            var list5 = chunk.GetList<T5>(job.Archetype.GetListOffset(typeof(T5)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -589,13 +552,13 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
-            yield return ComponentRegistry.Type<T2>.Id;
-            yield return ComponentRegistry.Type<T3>.Id;
-            yield return ComponentRegistry.Type<T4>.Id;
-            yield return ComponentRegistry.Type<T5>.Id;
+            yield return ComponentMetaData<T1>.Instance;
+            yield return ComponentMetaData<T2>.Instance;
+            yield return ComponentMetaData<T3>.Instance;
+            yield return ComponentMetaData<T4>.Instance;
+            yield return ComponentMetaData<T5>.Instance;
         }
     }
 
@@ -616,20 +579,17 @@ namespace EntitiesDb.Queries
             _state = state;
         }
 
-        public void CopyIndices(EntityGroup group, Span<int> indices) =>
-            group.GetComponentListIndex<T1, T2, T3, T4, T5, T6>(indices);
-
-        public void EnumerateChunk(in EnumerationJob job, Span<int> indices)
+        public void EnumerateChunk(in EnumerationJob job)
         {
-            var chunk = job.Group.GetChunk(job.ChunkIndex);
-            var count = job.Group.GetChunkLength(job.ChunkIndex);
-            var entityIds = chunk.EntityIds;
-            var list1 = chunk.GetList<T1>(job.Group.ListOffsets[indices[0]]);
-            var list2 = chunk.GetList<T2>(job.Group.ListOffsets[indices[1]]);
-            var list3 = chunk.GetList<T3>(job.Group.ListOffsets[indices[2]]);
-            var list4 = chunk.GetList<T4>(job.Group.ListOffsets[indices[3]]);
-            var list5 = chunk.GetList<T5>(job.Group.ListOffsets[indices[4]]);
-            var list6 = chunk.GetList<T6>(job.Group.ListOffsets[indices[5]]);
+            var chunk = job.Archetype.GetChunk(job.ChunkIndex);
+            var count = job.Archetype.GetChunkLength(job.ChunkIndex);
+            var entityIds = (uint*)chunk.Data;
+            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var list2 = chunk.GetList<T2>(job.Archetype.GetListOffset(typeof(T2)));
+            var list3 = chunk.GetList<T3>(job.Archetype.GetListOffset(typeof(T3)));
+            var list4 = chunk.GetList<T4>(job.Archetype.GetListOffset(typeof(T4)));
+            var list5 = chunk.GetList<T5>(job.Archetype.GetListOffset(typeof(T5)));
+            var list6 = chunk.GetList<T6>(job.Archetype.GetListOffset(typeof(T6)));
             for (int i = 0; i < count; i++)
             {
                 _idComponentFunc.Invoke(
@@ -652,14 +612,14 @@ namespace EntitiesDb.Queries
             }
         }
 
-        public IEnumerable<int> GetRequiredIds()
+        public IEnumerable<ComponentMetaData> GetDelegateMetaData()
         {
-            yield return ComponentRegistry.Type<T1>.Id;
-            yield return ComponentRegistry.Type<T2>.Id;
-            yield return ComponentRegistry.Type<T3>.Id;
-            yield return ComponentRegistry.Type<T4>.Id;
-            yield return ComponentRegistry.Type<T5>.Id;
-            yield return ComponentRegistry.Type<T6>.Id;
+            yield return ComponentMetaData<T1>.Instance;
+            yield return ComponentMetaData<T2>.Instance;
+            yield return ComponentMetaData<T3>.Instance;
+            yield return ComponentMetaData<T4>.Instance;
+            yield return ComponentMetaData<T5>.Instance;
+            yield return ComponentMetaData<T6>.Instance;
         }
     }
 }

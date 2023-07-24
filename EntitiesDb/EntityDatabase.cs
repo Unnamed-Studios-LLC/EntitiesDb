@@ -1,509 +1,831 @@
-﻿using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using EntitiesDb.Cache;
-using EntitiesDb.Components;
-using EntitiesDb.Data;
-using EntitiesDb.Events;
-using EntitiesDb.Queries;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace EntitiesDb
 {
-    public sealed partial class EntityDatabase : IDisposable
+    public sealed partial class EntityDatabase
     {
-        private const int DefaultParallelIndicesSize = 32;
+        public const int MaxEntities = int.MaxValue;
 
-        private static readonly ParallelOptions s_defaultParallelOptions = new();
-
-        private readonly List<EntityGroup> _groups = new();
-        private readonly Dictionary<EntityArchetype, EntityGroup> _archetypeMap = new();
-        private readonly Dictionary<long, List<EntityGroup>> _archetypeIndexBuckets = new();
-        private readonly Dictionary<uint, EntityReference> _entityMap = new();
-        private readonly Dictionary<EntityGroup, int> _parallelIndicesMap = new();
+        private readonly Dictionary<long, List<Archetype>> _indexedArchetypes = new();
+        private readonly Dictionary<int, List<Archetype>> _mappedArchetypes = new();
+        private readonly Dictionary<uint, EntityReference> _entityReferences = new();
+        private readonly List<Archetype> _archetypes = new();
+        private readonly List<Type> _componentTypes = new();
+        private readonly Dictionary<Type, int> _componentTypeMap = new();
         private readonly Stack<List<EnumerationJob>> _jobListCache = new();
+        private readonly Stack<HashSet<Type>> _queryFilterCache = new();
         private readonly EventDispatcher _eventDispatcher = new();
 
-        private readonly List<Exception> _eventExceptions = new();
-
-        private int[] _parallelIndices = new int[DefaultParallelIndicesSize * 6];
-        private int _nextParallelIndex = 0;
-        private uint _nextEntityId = 1;
-        private int _iterators = 0;
+        private int[] _workingIds = new int[256];
+        private ulong[] _workingMasks = new ulong[1];
+        private long[] _workingIndices = new long[256];
+        private Type[] _workingTypes = new Type[256];
+        private uint _entityIds = 0;
+        private int _enumerators = 0;
         private int _inParallel = 0;
         private bool _inEvent = false;
 
-        public int Count { get; private set; }
-        public IReadOnlyList<Exception> EventExceptions => _eventExceptions;
-        public bool ParallelEnabled { get; set; } = true;
-        public ParallelOptions ParallelOptions { get; set; } = new();
+        public int Count => _entityReferences.Count;
+        public bool ReadOnly => _enumerators != 0 || _inEvent;
 
-        internal ComponentRegistry ComponentRegistry { get; }= new();
-
-        public EntityDatabase()
+        public void AddComponent<T>(uint entityId, T component = default) where T : unmanaged
         {
-            PrePopulateCaches();
-        }
-
-        public unsafe ref T AddComponent<T>(uint entityId, T data = default) where T : unmanaged
-        {
-            var componentMetaData = ComponentRegistry.Get<T>();
-            componentMetaData.AddLayout.Add(data);
-            ApplyLayout(entityId, componentMetaData.AddLayout);
-            ref var reference = ref CollectionsMarshal.GetValueRefOrNullRef(_entityMap, entityId);
-            return ref reference.GetComponent<T>();
-        }
-
-        public unsafe void ApplyLayout(uint entityId, EntityLayout layout)
-        {
-            if (layout is null) throw new ArgumentNullException(nameof(layout));
-            ThrowIfStructuralChangeBlocked();
-            ref var reference = ref CollectionsMarshal.GetValueRefOrNullRef(_entityMap, entityId);
-            if (Unsafe.IsNullRef(ref reference)) ThrowEntityNotFound();
-            ClearEventExceptions();
-
-            // determine destination archetype
-            var currentArchetype = reference.Group?.Archetype ?? default;
-            var depthResult = layout.GetDepthResult(currentArchetype);
-            var destinationArchetype = ArchetypeCache.Rent(depthResult);
-            layout.Apply(currentArchetype, destinationArchetype);
-
-            // establish destination group
-            var destinationGroup = GetOrCreateGroup(destinationArchetype);
-            if (destinationGroup != reference.Group)
+            if (ReadOnly)
             {
-                var destination = destinationGroup != null ? new EntityReference(destinationGroup, destinationGroup.Add(entityId)) : default;
-
-                // publish remove events
-                if (reference.Group != null)
-                {
-                    var currentChunk = reference.Group.GetChunk(reference.Index.Chunk);
-                    int i = 0;
-                    byte* destinationPtr = null;
-                    foreach (var id in layout.RemoveArchetype.GetIds())
-                    {
-                        ref var componentType = ref Components.ComponentRegistry.Get(id);
-                        if (!componentType.ZeroSize)
-                        {
-                            while (reference.Group.ComponentIds[i] < id) i++;
-                            if (reference.Group.ComponentIds[i] > id) break; // this type is not contained in the current archetype
-
-                            var size = Components.ComponentRegistry.Get(id).Size;
-                            destinationPtr = currentChunk.GetComponent(reference.Group.ListOffsets[i], size, reference.Index.List);
-                        }
-                        else destinationPtr = null;
-
-                        componentType.OnRemove(this, entityId, destinationPtr);
-                    }
-                }
-
-                // copy shared components
-                reference.CopyComponentsInto(destination);
-
-                // remove from current group
-                if (reference.Group != null)
-                {
-                    var remappedEntityId = reference.Group.Remove(reference.Index);
-                    if (remappedEntityId != 0)
-                    {
-                        // remap a moved entity
-                        ref var remappedReference = ref CollectionsMarshal.GetValueRefOrAddDefault(_entityMap, remappedEntityId, out var exists);
-                        if (exists) remappedReference = new EntityReference(remappedReference.Group, reference.Index);
-                    }
-                }
-
-                // remap
-                reference = destination;
+                throw new ReadOnlyException();
             }
 
-            // apply layout data
-            if (reference.Group != null)
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
             {
-                var destinationChunk = reference.Group.GetChunk(reference.Index.Chunk);
-                int i = 0;
-                byte* destinationPtr = null;
-                fixed (byte* data = layout.ComponentData)
-                {
-                    int offset = 0;
-                    var hasDataArchetype = new EntityArchetype(layout.HasDataMask);
-                    foreach (var id in layout.AddArchetype.GetIds())
-                    {
-                        ref var componentType = ref Components.ComponentRegistry.Get(id);
-                        if (!componentType.ZeroSize)
-                        {
-                            while (reference.Group.ComponentIds[i] < id) i++;
-                            var size = Components.ComponentRegistry.Get(id).Size;
-                            destinationPtr = destinationChunk.GetComponent(reference.Group.ListOffsets[i], size, reference.Index.List);
-                            if (hasDataArchetype.Contains(id))
-                            {
-                                var sourcePtr = data + offset;
-                                Buffer.MemoryCopy(sourcePtr, destinationPtr, size, size);
-                            }
-                            offset += size;
-                        }
-                        else destinationPtr = null;
-                    }
-                }
-
-                // publish add events
-                i = 0;
-                foreach (var id in layout.AddArchetype.GetIds())
-                {
-                    if (currentArchetype.Contains(id)) continue; // already contains this type
-
-                    ref var componentType = ref Components.ComponentRegistry.Get(id);
-                    if (!componentType.ZeroSize)
-                    {
-                        while (reference.Group.ComponentIds[i] < id) i++;
-                        var size = Components.ComponentRegistry.Get(id).Size;
-                        destinationPtr = destinationChunk.GetComponent(reference.Group.ListOffsets[i], size, reference.Index.List);
-                    }
-                    else destinationPtr = null;
-
-                    componentType.OnAdd(this, entityId, destinationPtr);
-                }
+                throw new EntityNotFoundException(entityId);
             }
 
-            // cleanup
-            ArchetypeCache.Return(destinationArchetype);
-        }
+            // retrieve metadata first to ensure static contructors are run for this type
+            var metaData = ComponentMetaData<T>.Instance;
 
-        public unsafe uint CloneEntity(uint entityId)
-        {
-            if (!_entityMap.ContainsKey(entityId)) ThrowEntityNotFound();
-
-            var newEntityId = CreateEntity();
-            ref var source = ref CollectionsMarshal.GetValueRefOrNullRef(_entityMap, entityId);
-            ref var destination = ref CollectionsMarshal.GetValueRefOrNullRef(_entityMap, newEntityId);
-            ClearEventExceptions();
-
-            if (source.Group != null)
+            // resolve archetype
+            var added = !entityReference.Archetype.ContainsType(typeof(T));
+            if (added)
             {
-                destination = new EntityReference(source.Group, source.Group.Add(newEntityId));
-
-                // copy shared components
-                source.CopyComponentsInto(destination);
-
-                // publish add events
-                var destinationChunk = destination.Group.GetChunk(destination.Index.Chunk);
-                int i = 0;
-                byte* destinationPtr = null;
-                foreach (var id in destination.Group.Archetype.GetIds())
-                {
-                    ref var componentType = ref Components.ComponentRegistry.Get(id);
-                    if (!componentType.ZeroSize)
-                    {
-                        while (destination.Group.ComponentIds[i] < id) i++;
-                        var size = Components.ComponentRegistry.Get(id).Size;
-                        destinationPtr = destinationChunk.GetComponent(destination.Group.ListOffsets[i], size, destination.Index.List);
-                    }
-                    else destinationPtr = null;
-
-                    componentType.OnAdd(this, entityId, destinationPtr);
-                }
+                // archetype changed
+                // move entity to new archetype
+                var destinationMask = GetDestinationMaskAdd(entityReference.Archetype, typeof(T));
+                var newArchetype = GetArchetype(destinationMask);
+                entityReference = MoveEntity(entityId, entityReference, newArchetype);
             }
-            return newEntityId;
+
+            // set component data
+            ref var addedComponent = ref ComponentMetaData<T>.Empty;
+            if (metaData.Size != 0)
+            {
+                // only set if non-zero
+                var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
+                var listOffset = entityReference.Archetype.GetListOffset(typeof(T));
+                addedComponent = ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex);
+                addedComponent = component;
+            }
+
+            // add event
+            if (added)
+            {
+                PublishAddEvent(entityId, ref addedComponent);
+            }
         }
 
-        public uint CreateEntity() => CreateEntity(0);
-        public uint CreateEntity(uint entityId)
+        public void ApplyLayout(uint entityId, EntityLayout entityLayout)
         {
-            ThrowIfStructuralChangeBlocked();
-            if (entityId == 0) entityId = GenerateEntityId();
-            else if (_entityMap.ContainsKey(entityId)) throw new Exception($"Cannot create entity, entity id is already in use!");
-            _entityMap.Add(entityId, default);
-            Count++;
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            // resolve archetype
+            var destinationMask = GetDestinationMask(entityReference.Archetype, entityLayout);
+            var newArchetype = GetArchetype(destinationMask);
+            var archetypeChanged = newArchetype != entityReference.Archetype;
+            var newEntityReference = entityReference;
+            if (archetypeChanged)
+            {
+                // archetype changed
+                // remove events
+                PublishRemoveEvents(entityId, entityReference, newArchetype);
+
+                // move entity to new archetype
+                newEntityReference = MoveEntity(entityId, entityReference, newArchetype);
+            }
+
+            // set component data
+            SetComponentData(newEntityReference, entityLayout);
+
+            // add events
+            if (archetypeChanged)
+            {
+                PublishAddEvents(entityId, newEntityReference, entityReference.Archetype);
+            }
+        }
+
+        public void Clear()
+        {
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            _indexedArchetypes.Clear();
+            _mappedArchetypes.Clear();
+            _entityReferences.Clear();
+            _componentTypes.Clear();
+            _componentTypeMap.Clear();
+            _jobListCache.Clear();
+            _queryFilterCache.Clear();
+            _queryFilterCache.Clear();
+            _eventDispatcher.Clear();
+
+            _workingIds = new int[256];
+            _workingIndices = new long[256];
+            _workingMasks = new ulong[1];
+            _workingTypes = new Type[256];
+            _entityIds = 0;
+
+            foreach (var archetype in _archetypes)
+            {
+                archetype.Dispose();
+            }
+            _archetypes.Clear();
+        }
+
+        public uint CloneEntity(uint entityId)
+        {
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            if (_entityReferences.Count >= MaxEntities)
+            {
+                throw new EntityMaxException(MaxEntities);
+            }
+
+            var clonedEntityId = GetAvailableEntityId();
+            var clonedEntityIndex = entityReference.Archetype.Add(clonedEntityId);
+            var clonedEntityReference = new EntityReference(entityReference.Archetype, clonedEntityIndex);
+            CopyComponents(in entityReference, in clonedEntityReference);
+            _entityReferences.Add(clonedEntityId, clonedEntityReference);
+
+            // add entity event
+            try
+            {
+                _eventDispatcher.OnAddEntity(clonedEntityId);
+            }
+            catch (Exception e)
+            {
+                throw new EventException(e);
+            }
+
+            // add component events
+            PublishAddEvents(clonedEntityId, clonedEntityReference, null);
+
+            return clonedEntityId;
+        }
+
+        public uint CreateEntity()
+        {
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            if (_entityReferences.Count >= MaxEntities)
+            {
+                throw new EntityMaxException(MaxEntities);
+            }
+
+            var entityId = GetAvailableEntityId();
+            CreateEntityInternal(entityId, Span<ulong>.Empty);
+
+            // add entity event
+            try
+            {
+                _eventDispatcher.OnAddEntity(entityId);
+            }
+            catch (Exception e)
+            {
+                throw new EventException(e);
+            }
+
             return entityId;
         }
 
-        public uint CreateEntity(EntityLayout layout) => CreateEntity(0, layout);
-        public uint CreateEntity(uint entityId, EntityLayout layout)
+        public uint CreateEntity(EntityLayout entityLayout)
         {
-            if (layout is null) throw new ArgumentNullException(nameof(layout));
-            entityId = CreateEntity(entityId);
-            ApplyLayout(entityId, layout);
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            if (_entityReferences.Count >= MaxEntities)
+            {
+                throw new EntityMaxException(MaxEntities);
+            }
+
+            // create entity
+            var entityId = GetAvailableEntityId();
+            var destinationMasks = GetDestinationMask(entityLayout);
+            var entityReference = CreateEntityInternal(entityId, destinationMasks);
+
+            // set component data
+            SetComponentData(entityReference, entityLayout);
+
+            // add entity event
+            try
+            {
+                _eventDispatcher.OnAddEntity(entityId);
+            }
+            catch (Exception e)
+            {
+                throw new EventException(e);
+            }
+
+            // add component events
+            PublishAddEvents(entityId, entityReference, null);
+
+            return entityId;
+        }
+
+        public uint CreateEntity(uint entityId)
+        {
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            if (_entityReferences.ContainsKey(entityId))
+            {
+                throw new EntityConflictException(entityId);
+            }
+
+            CreateEntityInternal(entityId, Span<ulong>.Empty);
+
+            // add entity event
+            try
+            {
+                _eventDispatcher.OnAddEntity(entityId);
+            }
+            catch (Exception e)
+            {
+                throw new EventException(e);
+            }
+
+            return entityId;
+        }
+
+        public uint CreateEntity(uint entityId, EntityLayout entityLayout)
+        {
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            if (_entityReferences.ContainsKey(entityId))
+            {
+                throw new EntityConflictException(entityId);
+            }
+
+            var destinationMasks = GetDestinationMask(entityLayout);
+            var entityReference = CreateEntityInternal(entityId, destinationMasks);
+
+            // set component data
+            SetComponentData(entityReference, entityLayout);
+
+            // add entity event
+            try
+            {
+                _eventDispatcher.OnAddEntity(entityId);
+            }
+            catch (Exception e)
+            {
+                throw new EventException(e);
+            }
+
+            // add component events
+            PublishAddEvents(entityId, entityReference, null);
+
             return entityId;
         }
 
         public void DestroyAllEntities()
         {
-            ThrowIfStructuralChangeBlocked();
-
-            for (int i = 0; i < _groups.Count; i++)
+            if (ReadOnly)
             {
-                var group = _groups[i];
+                throw new ReadOnlyException();
+            }
 
-                // destroy entities backwards to avoid component patching
-                while (group.TryGetLastEntityId(out var entityId))
+            // destroy all entities from end to start of chunks (to avoid patching)
+            foreach (var archetype in _archetypes)
+            {
+                while (archetype.ChunkCount > 0)
                 {
-                    DestroyEntity(entityId);
+                    DestroyEntity(archetype.GetLastEntityId());
                 }
             }
         }
 
-        public unsafe bool DestroyEntity(uint entityId)
+        public void DestroyEntity(uint entityId)
         {
-            ThrowIfStructuralChangeBlocked();
-            if (!_entityMap.Remove(entityId, out var reference)) return false;
-            Count--;
-            if (reference.Group == null) return true;
-            ClearEventExceptions();
-
-            // publish remove events
-            var currentChunk = reference.Group.GetChunk(reference.Index.Chunk);
-            int i = 0;
-            byte* destinationPtr;
-            foreach (var id in reference.Group.Archetype.GetIds())
+            if (ReadOnly)
             {
-                ref var componentType = ref Components.ComponentRegistry.Get(id);
-                if (!componentType.ZeroSize)
-                {
-                    var size = Components.ComponentRegistry.Get(id).Size;
-                    destinationPtr = currentChunk.GetComponent(reference.Group.ListOffsets[i++], size, reference.Index.List);
-                }
-                else destinationPtr = null;
-
-                componentType.OnRemove(this, entityId, destinationPtr);
+                throw new ReadOnlyException();
             }
 
-            // remove from group
-            var remappedEntityId = reference.Group.Remove(reference.Index);
-            if (remappedEntityId != 0)
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
             {
-                // remap a moved entity
-                ref var remappedReference = ref CollectionsMarshal.GetValueRefOrAddDefault(_entityMap, remappedEntityId, out var exists);
-                if (exists) remappedReference = new EntityReference(remappedReference.Group, reference.Index);
+                throw new EntityNotFoundException(entityId);
             }
-            return true;
+
+            // remove entity event
+            try
+            {
+                _eventDispatcher.OnRemoveEntity(entityId);
+            }
+            catch (Exception e)
+            {
+                throw new EventException(e);
+            }
+
+            // remove component events
+            PublishRemoveEvents(entityId, entityReference, null);
+
+            var remappedEntityId = entityReference.Archetype.Remove(entityReference.Indices);
+            if (remappedEntityId != 0) _entityReferences[remappedEntityId] = entityReference;
+            _entityReferences.Remove(entityId);
         }
 
-        public void DisableEntity(uint entityId) => AddComponent<Disabled>(entityId);
-
-        public void Dispose()
-        {
-            ThrowIfStructuralChangeBlocked();
-            foreach (var group in _groups) group.Dispose();
-            _groups.Clear();
-            _archetypeIndexBuckets.Clear();
-            _archetypeMap.Clear();
-            _eventDispatcher.Clear();
-        }
-
-        public void EnableEntity(uint entityId) => RemoveComponent<Disabled>(entityId);
-
-        public bool EntityExists(uint entityId) => _entityMap.ContainsKey(entityId);
-
-        public EntityArchetype GetArchetype(uint entityId)
-        {
-            if (!_entityMap.TryGetValue(entityId, out var reference)) ThrowEntityNotFound();
-            return reference.Group?.Archetype ?? default;
-        }
-
-        public ComponentType GetComponentType(int typeId) => ComponentRegistry.Get(typeId);
-        public ComponentType GetComponentType<T>() where T : unmanaged => ComponentRegistry.Get<T>();
+        public bool EntityExists(uint entityId) => _entityReferences.ContainsKey(entityId);
 
         public ref T GetComponent<T>(uint entityId) where T : unmanaged
         {
-            if (!_entityMap.TryGetValue(entityId, out var reference)) ThrowEntityNotFound();
-            return ref reference.GetComponent<T>();
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            if (!entityReference.Archetype.TryGetListOffset(typeof(T), out var listOffset))
+            {
+                throw new ComponentNotFoundException(entityId, typeof(T));
+            }
+
+            var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
+            return ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex);
         }
 
-        public Entity GetEntity(uint entityId)
+        public IEnumerable<Type> GetComponentTypes(uint entityId)
         {
-            if (!_entityMap.TryGetValue(entityId, out var reference)) ThrowEntityNotFound();
-            return reference.GetEntity();
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            return entityReference.Archetype.Types;
         }
 
         public bool HasComponent<T>(uint entityId) where T : unmanaged
         {
-            if (!_entityMap.TryGetValue(entityId, out var reference)) ThrowEntityNotFound();
-            var componentType = ComponentRegistry.Get<T>();
-            return reference.Group != null && reference.Group.Archetype.Contains(componentType.Id);
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            return entityReference.Archetype.ContainsType(typeof(T));
         }
 
-        public void RemoveAllEventHandlers()
+        public bool RemoveComponent<T>(uint entityId) where T : unmanaged
         {
-            ThrowIfStructuralChangeBlocked();
-            _eventDispatcher.Clear();
-        }
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
 
-        public unsafe bool RemoveComponent<T>(uint entityId) where T : unmanaged
-        {
-            var componentType = ComponentRegistry.Get<T>();
-            var archetype = GetArchetype(entityId);
-            if (!archetype.Contains(componentType.Id)) return false;
-            ApplyLayout(entityId, componentType.MetaData.RemoveLayout);
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            if (!entityReference.Archetype.TryGetListOffset(typeof(T), out var listOffset))
+            {
+                return false;
+            }
+
+            // remove event
+            ref var removedComponent = ref ComponentMetaData<T>.Empty;
+            if (listOffset >= 0)
+            {
+                removedComponent = ref entityReference.GetChunk().GetComponent<T>(listOffset, entityReference.Indices.ListIndex);
+            }
+            PublishRemoveEvent(entityId, ref removedComponent);
+
+            // move entity to new archetype
+            var destinationMask = GetDestinationMaskRemove(entityReference.Archetype, typeof(T));
+            var newArchetype = GetArchetype(destinationMask);
+            MoveEntity(entityId, entityReference, newArchetype);
             return true;
         }
 
         public ref T TryGetComponent<T>(uint entityId, out bool found) where T : unmanaged
         {
-            if (!_entityMap.TryGetValue(entityId, out var reference)) ThrowEntityNotFound();
-            return ref reference.TryGetComponent<T>(out found);
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            if (!entityReference.Archetype.TryGetListOffset(typeof(T), out var listOffset))
+            {
+                found = false;
+                return ref ComponentMetaData<T>.Empty;
+            }
+
+            found = true;
+            var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
+            return ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex);
         }
 
-        internal unsafe void Query<T>(T query, bool parallel, QueryFilter queryFilter) where T : IQuery
+        internal void Query<TQuery>(TQuery query, bool parallel, in QueryFilter filter) where TQuery : IQuery
         {
-            Interlocked.Increment(ref _iterators);
-            parallel = parallel && ParallelEnabled && Interlocked.CompareExchange(ref _inParallel, 1, 0) == 0;
+            Interlocked.Increment(ref _enumerators);
+            parallel = parallel && Interlocked.CompareExchange(ref _inParallel, 1, 0) == 0;
             try
             {
-                foreach (var id in query.GetRequiredIds())
+                foreach (var metaData in query.GetDelegateMetaData())
                 {
                     // add required ids to with filter
-                    QueryFilter.AddtoFilter(ref queryFilter.WithFilter, id);
+                    if (metaData.Size == 0) throw new ForEachTagException(metaData.Type);
+                    filter.WithTypes.Add(metaData.Type);
                 }
 
                 // determine jobs
-                var index = queryFilter.WithFilter.GetQueryIndex();
-                var groupList = _archetypeIndexBuckets.TryGetValue(index, out var indexGroup) ? indexGroup : _groups;
+                Span<ulong> with = stackalloc ulong[_workingMasks.Length];
+                Span<ulong> no = stackalloc ulong[_workingMasks.Length];
+                Span<ulong> any = stackalloc ulong[_workingMasks.Length];
+
+                with = GetDestinationMask(filter.WithTypes, with);
+                no = GetDestinationMask(filter.NoTypes, no);
+                any = GetDestinationMask(filter.AnyTypes, any);
+
+                // return filters
+                ReturnQueryFilter(in filter);
+
+                var index = Mask.GetQueryIndex(with, _workingIds);
+                var archetypeList = _indexedArchetypes.TryGetValue(index, out var indexGroup) ? indexGroup : _archetypes;
                 var jobList = RentJobList();
-                foreach (var group in groupList)
+                foreach (var archetype in archetypeList)
                 {
                     // check against filter
-                    if (!queryFilter.Contains(in group.Archetype)) continue;
-                    if (parallel)
+                    if (!Mask.Match(archetype.Mask, with, no, any)) continue;
+                    for (int i = 0; i < archetype.ChunkCount; i++)
                     {
-                        var indicesIndex = MapParallelIndices(group);
-                        var indices = _parallelIndices.AsSpan(indicesIndex * 6, 6);
-                        query.CopyIndices(group, indices);
-                    }
-
-                    for (int i = 0; i < group.ChunkCount; i++)
-                    {
-                        jobList.Add(new(group, i));
+                        jobList.Add(new(archetype, i));
                     }
                 }
-
-                // recycle query filter
-                queryFilter.Return();
 
                 // enumerate chunks
                 if (!parallel)
                 {
-                    Span<int> indices = stackalloc int[6];
-                    EntityGroup? indicesForGroup = null;
-                    var jobSpan = CollectionsMarshal.AsSpan(jobList);
-                    foreach (ref var job in jobSpan)
+                    foreach (var job in jobList)
                     {
-                        if (indicesForGroup != job.Group)
-                        {
-                            query.CopyIndices(job.Group, indices);
-                            indicesForGroup = job.Group;
-                        }
-                        query.EnumerateChunk(in job, indices);
+                        query.EnumerateChunk(in job);
                     }
                 }
                 else
                 {
-                    Parallel.ForEach(jobList, ParallelOptions ?? s_defaultParallelOptions, (job) =>
+                    Parallel.ForEach(jobList, job =>
                     {
-                        var indicesIndex = _parallelIndicesMap[job.Group];
-                        var indices = _parallelIndices.AsSpan(indicesIndex * 6, 6);
-                        query.EnumerateChunk(in job, indices);
+                        query.EnumerateChunk(in job);
                     });
-                    ClearParallel();
                 }
 
-                // cleanup
+                // return job list
                 ReturnJobList(jobList);
             }
             finally
             {
-                Interlocked.Decrement(ref _iterators);
+                Interlocked.Decrement(ref _enumerators);
                 if (parallel) _inParallel = 0;
             }
         }
 
-        private void ClearEventExceptions()
+        private void CopyComponents(in EntityReference source, in EntityReference destination)
         {
-            _eventExceptions.Clear();
-        }
+            var sourceChunk = source.Archetype.GetChunk(source.Indices.ChunkIndex);
+            var destinationChunk = destination.Archetype.GetChunk(destination.Indices.ChunkIndex);
 
-        private void ClearParallel()
-        {
-            _parallelIndicesMap.Clear();
-            _nextParallelIndex = 0;
-        }
-
-        private uint GenerateEntityId()
-        {
-            if (_entityMap.Count >= int.MaxValue) throw new Exception("Maximum entities reached");
-            uint id;
-            do
+            foreach (var metaData in source.Archetype.MetaData)
             {
-                id = _nextEntityId++;
+                if (metaData.Size == 0 || // ignore zero-size
+                    !source.Archetype.TryGetListOffset(metaData.Type, out var sourceOffset) ||
+                    !destination.Archetype.TryGetListOffset(metaData.Type, out var destinationOffset))
+                {
+                    continue;
+                }
+
+                Chunk.Copy(
+                    sourceChunk, sourceOffset,
+                    destinationChunk, destinationOffset,
+                    metaData.Size
+                );
             }
-            while (_entityMap.ContainsKey(id));
+        }
+
+        private EntityReference CreateEntityInternal(uint entityId, Span<ulong> masks)
+        {
+            var archetype = GetArchetype(masks);
+            var index = archetype.Add(entityId);
+            var reference = new EntityReference(archetype, index);
+            _entityReferences.Add(entityId, reference);
+            return reference;
+        }
+
+        private Archetype GetArchetype(Span<ulong> masks)
+        {
+            var hashCode = Mask.GetHashCode(masks);
+            if (!_mappedArchetypes.TryGetValue(hashCode, out var bucket))
+            {
+                bucket = new();
+                _mappedArchetypes.Add(hashCode, bucket);
+            }
+
+            Archetype archetype = null;
+            foreach (var item in bucket)
+            {
+                if (!masks.SequenceEqual(item.Mask)) continue;
+                archetype = item;
+                break;
+            }
+
+            if (archetype == null)
+            {
+                var typeCount = GetTypes(masks, ref _workingTypes);
+                archetype = new Archetype(masks.ToArray(), _workingTypes.AsSpan(0, typeCount));
+                bucket.Add(archetype); // add to mapped archetypes
+                _archetypes.Add(archetype);
+
+                // add to indexed archetypes
+                var indexCount = Mask.GetIndices(masks, _workingIds, ref _workingIndices);
+                var indices = _workingIndices.AsSpan(0, indexCount);
+                foreach (ref var index in indices)
+                {
+                    if (!_indexedArchetypes.TryGetValue(index, out var indexBucket))
+                    {
+                        indexBucket = new();
+                        _indexedArchetypes.Add(index, indexBucket);
+                    }
+                    indexBucket.Add(archetype);
+                }
+            }
+            return archetype;
+        }
+
+        private uint GetAvailableEntityId()
+        {
+            while (++_entityIds == 0 || _entityReferences.ContainsKey(_entityIds)) { }
+            return _entityIds;
+        }
+
+        private Span<ulong> GetDestinationMask(IEnumerable<Type> types, Span<ulong> masks)
+        {
+            masks.Clear();
+            foreach (var type in types)
+            {
+                var typeId = GetTypeId(type);
+                Mask.IdAdd(masks, typeId, masks);
+            }
+            return Mask.Trim(masks);
+        }
+
+        private Span<ulong> GetDestinationMask(EntityLayout entityLayout)
+        {
+            Array.Clear(_workingMasks, 0, _workingMasks.Length);
+            foreach (var pair in entityLayout.AddedComponents)
+            {
+                var typeId = GetTypeId(pair.Key);
+                Mask.IdAdd(_workingMasks, typeId, _workingMasks);
+            }
+            return Mask.Trim(_workingMasks);
+        }
+
+        private Span<ulong> GetDestinationMask(Archetype currentArchetype, EntityLayout entityLayout)
+        {
+            Array.Clear(_workingMasks, 0, _workingMasks.Length);
+            currentArchetype.Mask.CopyTo(_workingMasks.AsSpan());
+
+            foreach (var pair in entityLayout.AddedComponents)
+            {
+                var typeId = GetTypeId(pair.Key);
+                Mask.IdAdd(_workingMasks, typeId, _workingMasks);
+            }
+
+            foreach (var type in entityLayout.RemovedComponents)
+            {
+                var typeId = GetTypeId(type);
+                Mask.IdRemove(_workingMasks, typeId, _workingMasks);
+            }
+
+            return Mask.Trim(_workingMasks);
+        }
+
+        private Span<ulong> GetDestinationMaskAdd(Archetype currentArchetype, Type type)
+        {
+            var typeId = GetTypeId(type);
+            Array.Clear(_workingMasks, 0, _workingMasks.Length);
+            var masks = _workingMasks.AsSpan();
+            currentArchetype.Mask.CopyTo(masks);
+            Mask.IdAdd(masks, typeId, masks);
+            return Mask.Trim(masks);
+        }
+
+        private Span<ulong> GetDestinationMaskRemove(Archetype currentArchetype, Type type)
+        {
+            var typeId = GetTypeId(type);
+            Array.Clear(_workingMasks, 0, _workingMasks.Length);
+            var masks = _workingMasks.AsSpan();
+            currentArchetype.Mask.CopyTo(masks);
+            Mask.IdRemove(masks, typeId, masks);
+            return Mask.Trim(masks);
+        }
+
+        private int GetTypeId(Type type)
+        {
+            if (_componentTypeMap.TryGetValue(type, out var id)) return id;
+            id = _componentTypes.Count;
+            _componentTypes.Add(type);
+            _componentTypeMap.Add(type, id);
+            while (id > _workingIds.Length)
+            {
+                Array.Resize(ref _workingIds, _workingIds.Length * 2);
+            }
+
+            while (id / 64 > _workingMasks.Length)
+            {
+                Array.Resize(ref _workingMasks, _workingMasks.Length + 1);
+            }
             return id;
         }
 
-        private EntityGroup? GetOrCreateGroup(EntityArchetype destinationArchetype)
+        private int GetTypes(Span<ulong> masks, ref Type[] results)
         {
-            if (destinationArchetype.Depth == 0) return null;
-            if (!_archetypeMap.TryGetValue(destinationArchetype, out var value))
+            var count = Mask.GetIds(masks, _workingIds);
+            while (results.Length < count)
             {
-                var groupArchetype = ArchetypeCache.Rent(destinationArchetype.Depth);
-                destinationArchetype.CopyTo(groupArchetype);
+                Array.Resize(ref results, results.Length * 2);
+            }
 
-                value = new EntityGroup(groupArchetype);
-                _archetypeMap.Add(groupArchetype, value);
-                foreach (var index in value.Archetype.GetIndices())
+            for (int i = 0; i < count; i++)
+            {
+                results[i] = _componentTypes[_workingIds[i]];
+            }
+            return count;
+        }
+
+        private EntityReference MoveEntity(uint entityId, EntityReference entityReference, Archetype newArchetype)
+        {
+            // copy to new archetype
+            var newEntityIndex = newArchetype.Add(entityId);
+            var newEntityReference = new EntityReference(newArchetype, newEntityIndex);
+            CopyComponents(in entityReference, in newEntityReference);
+            _entityReferences[entityId] = newEntityReference;
+
+            // remove from old archetype
+            var remappedEntityId = entityReference.Archetype.Remove(entityReference.Indices);
+            if (remappedEntityId != 0) _entityReferences[remappedEntityId] = entityReference;
+            return newEntityReference;
+        }
+
+        private void PublishAddEvent<T>(uint entityId, ref T component) where T : unmanaged
+        {
+            try
+            {
+                _inEvent = true;
+                _eventDispatcher.OnAddComponent(entityId, ref component);
+            }
+            catch (Exception e)
+            {
+                throw new EventException(e);
+            }
+            finally
+            {
+                _inEvent = false;
+            }
+        }
+
+        private void PublishAddEvents(uint entityId, EntityReference entityReference, Archetype previousArchetype)
+        {
+            var chunk = entityReference.GetChunk();
+            foreach (var metaData in entityReference.Archetype.MetaData)
+            {
+                if (previousArchetype?.ContainsType(metaData.Type) ?? false) continue; // this type was not added
+                var listOffset = entityReference.Archetype.GetListOffset(metaData.Type);
+                try
                 {
-                    ref var indexBucket = ref CollectionsMarshal.GetValueRefOrAddDefault(_archetypeIndexBuckets, index, out var exists);
-                    if (!exists || indexBucket == null) indexBucket = new();
-                    indexBucket.Add(value);
+                    _inEvent = true;
+                    metaData.OnAddComponent(_eventDispatcher, entityId, chunk, listOffset, entityReference.Indices.ListIndex);
                 }
-                _groups.Add(value);
+                catch (Exception e)
+                {
+                    throw new EventException(e);
+                }
+                finally
+                {
+                    _inEvent = false;
+                }
             }
-            return value;
         }
 
-        private int MapParallelIndices(EntityGroup group)
+        private void PublishRemoveEvent<T>(uint entityId, ref T component) where T : unmanaged
         {
-            // get next indices index
-            var indicesIndex = _nextParallelIndex++;
-
-            // expand indices array if needed
-            if (indicesIndex * 6 >= _parallelIndices.Length)
+            try
             {
-                var newIndices = new int[_parallelIndices.Length * 2];
-                Array.Copy(_parallelIndices, newIndices, _parallelIndices.Length);
-                _parallelIndices = newIndices;
+                _inEvent = true;
+                _eventDispatcher.OnRemoveComponent(entityId, ref component);
             }
-
-            _parallelIndicesMap[group] = indicesIndex;
-            return indicesIndex;
+            catch (Exception e)
+            {
+                throw new EventException(e);
+            }
+            finally
+            {
+                _inEvent = false;
+            }
         }
 
-        private void PrePopulateCaches()
+        private void PublishRemoveEvents(uint entityId, EntityReference entityReference, Archetype newArchetype)
         {
-            for (int i = 0; i < 8; i++) _jobListCache.Push(new List<EnumerationJob>());
+            var chunk = entityReference.GetChunk();
+            foreach (var metaData in entityReference.Archetype.MetaData)
+            {
+                if (newArchetype?.ContainsType(metaData.Type) ?? false) continue; // this type was not removed
+                var listOffset = entityReference.Archetype.GetListOffset(metaData.Type);
+                try
+                {
+                    _inEvent = true;
+                    metaData.OnRemoveComponent(_eventDispatcher, entityId, chunk, listOffset, entityReference.Indices.ListIndex);
+                }
+                catch (Exception e)
+                {
+                    throw new EventException(e);
+                }
+                finally
+                {
+                    _inEvent = false;
+                }
+            }
         }
 
         private List<EnumerationJob> RentJobList()
         {
             lock (_jobListCache)
             {
-                return _jobListCache.TryPop(out var jobList) ? jobList : new List<EnumerationJob>();
+                return _jobListCache.Count == 0 ? new() : _jobListCache.Pop();
+            }
+        }
+
+        private QueryFilter RentQueryFilter()
+        {
+            lock (_queryFilterCache)
+            {
+                return new QueryFilter(
+                    this,
+                    _queryFilterCache.Count == 0 ? new() : _queryFilterCache.Pop(),
+                    _queryFilterCache.Count == 0 ? new() : _queryFilterCache.Pop(),
+                    _queryFilterCache.Count == 0 ? new() : _queryFilterCache.Pop()
+                );
             }
         }
 
         private void ReturnJobList(List<EnumerationJob> jobList)
         {
-            jobList.Clear();
             lock (_jobListCache)
             {
+                jobList.Clear();
                 _jobListCache.Push(jobList);
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ThrowIfStructuralChangeBlocked()
+        private void ReturnQueryFilter(in QueryFilter queryFilter)
         {
-            if (_iterators != 0) throw new Exception("Structural change not allowed during ForEach.");
-            if (_inEvent) throw new Exception("Structural change not allowed during event handler.");
+            lock (_queryFilterCache)
+            {
+                queryFilter.AnyTypes.Clear();
+                queryFilter.NoTypes.Clear();
+                queryFilter.WithTypes.Clear();
+                _queryFilterCache.Push(queryFilter.AnyTypes);
+                _queryFilterCache.Push(queryFilter.NoTypes);
+                _queryFilterCache.Push(queryFilter.WithTypes);
+            }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void ThrowEntityNotFound() => throw new Exception("No entity found at the given id.");
+        private void SetComponentData(EntityReference entityReference, EntityLayout entityLayout)
+        {
+            foreach (var pair in entityLayout.AddedComponents)
+            {
+                var metaData = ComponentMetaData.All[pair.Key];
+                if (metaData.Size == 0) continue; // only set non-zero components
+                var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
+                var listOffset = entityReference.Archetype.GetListOffset(pair.Key);
+                metaData.SetComponent(chunk, listOffset, entityReference.Indices.ListIndex, pair.Value);
+            }
+        }
     }
 }
+
