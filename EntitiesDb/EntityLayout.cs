@@ -11,6 +11,12 @@ namespace EntitiesDb
 		public IEnumerable<KeyValuePair<Type, object>> AddedComponents => _added;
 		public IEnumerable<Type> RemovedComponents => _removed;
 
+		/// <summary>
+		/// Defines a component to be added.
+		/// Overwrites any previous Add or Remove of the same type.
+		/// </summary>
+		/// <typeparam name="T">Component type</typeparam>
+		/// <param name="component">The component to add</param>
 		public void Add<T>(T component = default) where T : unmanaged
         {
             ComponentMetaData<T>.Register();
@@ -18,13 +24,22 @@ namespace EntitiesDb
             _added[typeof(T)] = component;
 		}
 
+		/// <summary>
+		/// Clears Added and Removed components
+		/// </summary>
 		public void Clear()
 		{
 			_added.Clear();
 			_removed.Clear();
 		}
 
-		public void Remove<T>() where T : unmanaged
+        /// <summary>
+        /// Defines a component to be removed.
+        /// Overwrites any previous Add or Remove of the same type.
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="component">The component to remove</param>
+        public void Remove<T>() where T : unmanaged
         {
             ComponentMetaData<T>.Register();
 			_added.Remove(typeof(T));

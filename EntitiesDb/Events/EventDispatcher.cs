@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace EntitiesDb
 {
-	public sealed class EventDispatcher
+	internal sealed class EventDispatcher
     {
         public event EntityHandler OnAdd;
         public event EntityHandler OnRemove;

@@ -1,7 +1,21 @@
-﻿namespace EntitiesDb
+﻿using System;
+
+namespace EntitiesDb
 {
     public sealed partial class EntityDatabase
     {
+        public QueryFilter Any(Type type)
+        {
+            var queryFilter = RentQueryFilter();
+            return queryFilter.Any(type);
+        }
+
+        public QueryFilter Any(params Type[] types)
+        {
+            var queryFilter = RentQueryFilter();
+            return queryFilter.Any(types);
+        }
+
         public QueryFilter Any<T1>()
             where T1 : unmanaged
         {
@@ -65,6 +79,18 @@
             return queryFilter.IncludeDisabled();
         }
 
+        public QueryFilter No(Type type)
+        {
+            var queryFilter = RentQueryFilter();
+            return queryFilter.No(type);
+        }
+
+        public QueryFilter No(params Type[] types)
+        {
+            var queryFilter = RentQueryFilter();
+            return queryFilter.No(types);
+        }
+
         public QueryFilter No<T1>()
             where T1 : unmanaged
         {
@@ -120,6 +146,18 @@
         {
             var queryFilter = RentQueryFilter();
             return queryFilter.No<T1, T2, T3, T4, T5, T6>();
+        }
+
+        public QueryFilter With(Type type)
+        {
+            var queryFilter = RentQueryFilter();
+            return queryFilter.With(type);
+        }
+
+        public QueryFilter With(params Type[] types)
+        {
+            var queryFilter = RentQueryFilter();
+            return queryFilter.With(types);
         }
 
         public QueryFilter With<T1>()
