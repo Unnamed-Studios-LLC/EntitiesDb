@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -664,8 +663,13 @@ namespace EntitiesDb
                 // return filters
                 ReturnQueryFilter(in filter);
 
-                var index = Mask.GetQueryIndex(with, _workingIds);
-                var archetypeList = _indexedArchetypes.TryGetValue(index, out var indexGroup) ? indexGroup : _archetypes;
+                var index = Mask.GetQueryIndex(with);
+                var archetypeList = index == 0 ? _archetypes : (_indexedArchetypes.TryGetValue(index, out var indexGroup) ? indexGroup : null);
+                if (archetypeList == null)
+                {
+                    return;
+                }
+
                 var jobList = RentJobList();
                 foreach (var archetype in archetypeList)
                 {
@@ -705,8 +709,8 @@ namespace EntitiesDb
 
         private void CopyComponents(in EntityReference source, in EntityReference destination)
         {
-            var sourceChunk = source.Archetype.GetChunk(source.Indices.ChunkIndex);
-            var destinationChunk = destination.Archetype.GetChunk(destination.Indices.ChunkIndex);
+            var sourceChunk = source.GetChunk();
+            var destinationChunk = destination.GetChunk();
 
             foreach (var metaData in source.Archetype.MetaData)
             {
@@ -718,8 +722,8 @@ namespace EntitiesDb
                 }
 
                 Chunk.Copy(
-                    sourceChunk, sourceOffset,
-                    destinationChunk, destinationOffset,
+                    sourceChunk, sourceOffset + source.Indices.ListIndex * metaData.Size,
+                    destinationChunk, destinationOffset + destination.Indices.ListIndex * metaData.Size,
                     metaData.Size
                 );
             }

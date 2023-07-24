@@ -112,11 +112,10 @@ namespace EntitiesDb
                 foreach (var metaData in MetaData)
                 {
                     if (metaData.Size == 0) continue; // ignore zero-size components
-                    var offset = _offsets[metaData.Type];
-                    var listOffset = offset * _chunkCapacity;
+                    var listOffset = _offsets[metaData.Type] * _chunkCapacity;
                     Chunk.Copy(
-                        lastChunk, listOffset + lastListIndex,
-                        chunk, listOffset + entityIndex.ListIndex,
+                        lastChunk, listOffset + lastListIndex * metaData.Size,
+                        chunk, listOffset + entityIndex.ListIndex * metaData.Size,
                         metaData.Size
                     );
                 }

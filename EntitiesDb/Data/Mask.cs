@@ -91,7 +91,7 @@ namespace EntitiesDb
             // index for each id
             for (int i = 0; i < idCount; i++)
             {
-                results[resultCount++] = idResult[i];
+                results[resultCount++] = idResult[i] + 1;
             }
 
             // index for each id pair
@@ -99,19 +99,20 @@ namespace EntitiesDb
             {
                 for (int j = i + 1; j < idCount; j++)
                 {
-                    results[resultCount++] = (long)idResult[j] << 32 | (uint)idResult[i];
+                    results[resultCount++] = (long)(idResult[j] + 1) << 32 | (uint)(idResult[i] + 1);
                 }
             }
             return resultCount;
         }
 
-        public static long GetQueryIndex(Span<ulong> masks, Span<int> idResult)
+        public static long GetQueryIndex(Span<ulong> masks)
         {
+            Span<int> idResult = stackalloc int[2];
             var idCount = GetIds(masks, idResult, 2);
             return idCount switch
             {
-                2 => (long)idResult[1] << 32 | (uint)idResult[0],
-                1 => idResult[0],
+                2 => (long)(idResult[1] + 1) << 32 | (uint)(idResult[0] + 1),
+                1 => idResult[0] + 1,
                 _ => 0
             };
         }
