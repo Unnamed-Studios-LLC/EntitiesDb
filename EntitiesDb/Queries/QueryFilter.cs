@@ -23,6 +23,18 @@ namespace EntitiesDb
             NoTypes.Add(typeof(Disabled));
         }
 
+        public QueryFilter Any(Type type)
+        {
+            AnyTypes.Add(type);
+            return this;
+        }
+
+        public QueryFilter Any(params Type[] types)
+        {
+            foreach (var type in types) AnyTypes.Add(type);
+            return this;
+        }
+
         public QueryFilter Any<T1>()
             where T1 : unmanaged
         {
@@ -101,6 +113,18 @@ namespace EntitiesDb
             return this;
         }
 
+        public QueryFilter No(Type type)
+        {
+            NoTypes.Add(type);
+            return this;
+        }
+
+        public QueryFilter No(params Type[] types)
+        {
+            foreach (var type in types) NoTypes.Add(type);
+            return this;
+        }
+
         public QueryFilter No<T1>()
             where T1 : unmanaged
         {
@@ -170,6 +194,18 @@ namespace EntitiesDb
             NoTypes.Add(typeof(T4));
             NoTypes.Add(typeof(T5));
             NoTypes.Add(typeof(T6));
+            return this;
+        }
+
+        public QueryFilter With(Type type)
+        {
+            WithTypes.Add(type);
+            return this;
+        }
+
+        public QueryFilter With(params Type[] types)
+        {
+            foreach (var type in types) WithTypes.Add(type);
             return this;
         }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +9,9 @@ namespace EntitiesDb
 {
     public sealed partial class EntityDatabase
     {
+        /// <summary>
+        /// The maximum amount of entities that can be stored in one <see cref="EntityDatabase"/>
+        /// </summary>
         public const int MaxEntities = int.MaxValue;
 
         private readonly Dictionary<long, List<Archetype>> _indexedArchetypes = new();
@@ -29,9 +33,25 @@ namespace EntitiesDb
         private int _inParallel = 0;
         private bool _inEvent = false;
 
+        /// <summary>
+        /// The amount of entities currently stored
+        /// </summary>
         public int Count => _entityReferences.Count;
+
+        /// <summary>
+        /// If entities and components can be added or removed
+        /// </summary>
         public bool ReadOnly => _enumerators != 0 || _inEvent;
 
+        /// <summary>
+        /// Adds or replaces a component
+        /// </summary>
+        /// <typeparam name="T">The component type</typeparam>
+        /// <param name="entityId">Id of the entity altered</param>
+        /// <param name="component">Component data</param>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="EventException"></exception>
         public void AddComponent<T>(uint entityId, T component = default) where T : unmanaged
         {
             if (ReadOnly)
@@ -76,6 +96,14 @@ namespace EntitiesDb
             }
         }
 
+        /// <summary>
+        /// Adds and removes components specified in the given <see cref="EntityLayout"/>
+        /// </summary>
+        /// <param name="entityId">Id of the entity altered</param>
+        /// <param name="entityLayout"></param>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="EventException"></exception>
         public void ApplyLayout(uint entityId, EntityLayout entityLayout)
         {
             if (ReadOnly)
@@ -113,6 +141,10 @@ namespace EntitiesDb
             }
         }
 
+        /// <summary>
+        /// Resets <see cref="EntityDatabase"/> to its initial state and may be reused
+        /// </summary>
+        /// <exception cref="ReadOnlyException"></exception>
         public void Clear()
         {
             if (ReadOnly)
@@ -143,6 +175,15 @@ namespace EntitiesDb
             _archetypes.Clear();
         }
 
+        /// <summary>
+        /// Clones an existing entity and its components
+        /// </summary>
+        /// <param name="entityId">Id of the entity to clone</param>
+        /// <returns>Id of the cloned entity</returns>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="EntityMaxException"></exception>
+        /// <exception cref="EventException"></exception>
         public uint CloneEntity(uint entityId)
         {
             if (ReadOnly)
@@ -167,14 +208,7 @@ namespace EntitiesDb
             _entityReferences.Add(clonedEntityId, clonedEntityReference);
 
             // add entity event
-            try
-            {
-                _eventDispatcher.OnAddEntity(clonedEntityId);
-            }
-            catch (Exception e)
-            {
-                throw new EventException(e);
-            }
+            PublishAddEntity(clonedEntityId);
 
             // add component events
             PublishAddEvents(clonedEntityId, clonedEntityReference, null);
@@ -182,6 +216,13 @@ namespace EntitiesDb
             return clonedEntityId;
         }
 
+        /// <summary>
+        /// Creates a new empty entity
+        /// </summary>
+        /// <returns>Id of the created entity</returns>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityMaxException"></exception>
+        /// <exception cref="EventException"></exception>
         public uint CreateEntity()
         {
             if (ReadOnly)
@@ -198,18 +239,19 @@ namespace EntitiesDb
             CreateEntityInternal(entityId, Span<ulong>.Empty);
 
             // add entity event
-            try
-            {
-                _eventDispatcher.OnAddEntity(entityId);
-            }
-            catch (Exception e)
-            {
-                throw new EventException(e);
-            }
+            PublishAddEntity(entityId);
 
             return entityId;
         }
 
+        /// <summary>
+        /// Creates a new entity with a given <see cref="EntityLayout"/>
+        /// </summary>
+        /// <param name="entityLayout">The layout to apply to the new entity</param>
+        /// <returns>Id of the created entity</returns>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityMaxException"></exception>
+        /// <exception cref="EventException"></exception>
         public uint CreateEntity(EntityLayout entityLayout)
         {
             if (ReadOnly)
@@ -231,14 +273,7 @@ namespace EntitiesDb
             SetComponentData(entityReference, entityLayout);
 
             // add entity event
-            try
-            {
-                _eventDispatcher.OnAddEntity(entityId);
-            }
-            catch (Exception e)
-            {
-                throw new EventException(e);
-            }
+            PublishAddEntity(entityId);
 
             // add component events
             PublishAddEvents(entityId, entityReference, null);
@@ -246,6 +281,14 @@ namespace EntitiesDb
             return entityId;
         }
 
+        /// <summary>
+        /// Creates a new empty entity with a given id
+        /// </summary>
+        /// <param name="entityId">Id to assign to the new entity</param>
+        /// <returns>Id of the created entity</returns>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityConflictException"></exception>
+        /// <exception cref="EventException"></exception>
         public uint CreateEntity(uint entityId)
         {
             if (ReadOnly)
@@ -261,18 +304,20 @@ namespace EntitiesDb
             CreateEntityInternal(entityId, Span<ulong>.Empty);
 
             // add entity event
-            try
-            {
-                _eventDispatcher.OnAddEntity(entityId);
-            }
-            catch (Exception e)
-            {
-                throw new EventException(e);
-            }
+            PublishAddEntity(entityId);
 
             return entityId;
         }
 
+        /// <summary>
+        /// Creates a new entity with a given <see cref="EntityLayout"/> and a given id
+        /// </summary>
+        /// <param name="entityId">Id to assign to the new entity</param>
+        /// <param name="entityLayout">The layout to apply to the new entity</param>
+        /// <returns>Id of the created entity</returns>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityConflictException"></exception>
+        /// <exception cref="EventException"></exception>
         public uint CreateEntity(uint entityId, EntityLayout entityLayout)
         {
             if (ReadOnly)
@@ -292,14 +337,7 @@ namespace EntitiesDb
             SetComponentData(entityReference, entityLayout);
 
             // add entity event
-            try
-            {
-                _eventDispatcher.OnAddEntity(entityId);
-            }
-            catch (Exception e)
-            {
-                throw new EventException(e);
-            }
+            PublishAddEntity(entityId);
 
             // add component events
             PublishAddEvents(entityId, entityReference, null);
@@ -307,6 +345,11 @@ namespace EntitiesDb
             return entityId;
         }
 
+        /// <summary>
+        /// Destroys all entities
+        /// </summary>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EventException"></exception>
         public void DestroyAllEntities()
         {
             if (ReadOnly)
@@ -324,6 +367,13 @@ namespace EntitiesDb
             }
         }
 
+        /// <summary>
+        /// Destroys a given entity
+        /// </summary>
+        /// <param name="entityId">Id of the entity to destroy</param>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="EventException"></exception>
         public void DestroyEntity(uint entityId)
         {
             if (ReadOnly)
@@ -337,14 +387,7 @@ namespace EntitiesDb
             }
 
             // remove entity event
-            try
-            {
-                _eventDispatcher.OnRemoveEntity(entityId);
-            }
-            catch (Exception e)
-            {
-                throw new EventException(e);
-            }
+            PublishRemoveEntity(entityId);
 
             // remove component events
             PublishRemoveEvents(entityId, entityReference, null);
@@ -354,8 +397,22 @@ namespace EntitiesDb
             _entityReferences.Remove(entityId);
         }
 
+        /// <summary>
+        /// Returns if an entity exists at a given id
+        /// </summary>
+        /// <param name="entityId">Id to check</param>
+        /// <returns>If an entity exists at the given id</returns>
         public bool EntityExists(uint entityId) => _entityReferences.ContainsKey(entityId);
 
+        /// <summary>
+        /// Returns a reference to a component for an entity.
+        /// Ref values may be invalid after structural changes and should not be stored.
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="entityId">Id of the entity</param>
+        /// <returns>Reference to the component for the given entity</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="ComponentNotFoundException"></exception>
         public ref T GetComponent<T>(uint entityId) where T : unmanaged
         {
             if (!_entityReferences.TryGetValue(entityId, out var entityReference))
@@ -372,6 +429,12 @@ namespace EntitiesDb
             return ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex);
         }
 
+        /// <summary>
+        /// Gets the types for components on an entity
+        /// </summary>
+        /// <param name="entityId">Id of the entity</param>
+        /// <returns>Types for components on the given entity</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
         public IEnumerable<Type> GetComponentTypes(uint entityId)
         {
             if (!_entityReferences.TryGetValue(entityId, out var entityReference))
@@ -382,6 +445,13 @@ namespace EntitiesDb
             return entityReference.Archetype.Types;
         }
 
+        /// <summary>
+        /// Returns if an entity has a given component type
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="entityId">Id of the entity</param>
+        /// <returns>If the entity has the given component type</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
         public bool HasComponent<T>(uint entityId) where T : unmanaged
         {
             if (!_entityReferences.TryGetValue(entityId, out var entityReference))
@@ -392,6 +462,32 @@ namespace EntitiesDb
             return entityReference.Archetype.ContainsType(typeof(T));
         }
 
+        /// <summary>
+        /// Returns if an entity has a given component type
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="entityId">Id of the entity</param>
+        /// <param name="type">The type to check</param>
+        /// <returns>If the entity has the given component type</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        public bool HasComponent(uint entityId, Type type)
+        {
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            return entityReference.Archetype.ContainsType(type);
+        }
+
+        /// <summary>
+        /// Removes a component for a given entity if the entity contains the component
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="entityId">Id of the entity</param>
+        /// <returns>If the component was found and removed</returns>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
         public bool RemoveComponent<T>(uint entityId) where T : unmanaged
         {
             if (ReadOnly)
@@ -692,6 +788,23 @@ namespace EntitiesDb
             return newEntityReference;
         }
 
+        private void PublishAddEntity(uint entityId)
+        {
+            try
+            {
+                _inEvent = true;
+                _eventDispatcher.OnAddEntity(entityId);
+            }
+            catch (Exception e)
+            {
+                throw new EventException(e);
+            }
+            finally
+            {
+                _inEvent = false;
+            }
+        }
+
         private void PublishAddEvent<T>(uint entityId, ref T component) where T : unmanaged
         {
             try
@@ -729,6 +842,23 @@ namespace EntitiesDb
                 {
                     _inEvent = false;
                 }
+            }
+        }
+
+        private void PublishRemoveEntity(uint entityId)
+        {
+            try
+            {
+                _inEvent = true;
+                _eventDispatcher.OnRemoveEntity(entityId);
+            }
+            catch (Exception e)
+            {
+                throw new EventException(e);
+            }
+            finally
+            {
+                _inEvent = false;
             }
         }
 
