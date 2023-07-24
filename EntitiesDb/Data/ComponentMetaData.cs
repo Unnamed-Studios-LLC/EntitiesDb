@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Linq;
+using System.Reflection;
 
 namespace EntitiesDb
 {
@@ -57,7 +59,7 @@ namespace EntitiesDb
 			All[typeof(T)] = Instance;
 		}
 
-        public ComponentMetaData() : base(typeof(T), sizeof(T))
+        public ComponentMetaData() : base(typeof(T), IsZeroSize(typeof(T)) ? 0 : sizeof(T))
         {
         }
 
@@ -85,6 +87,13 @@ namespace EntitiesDb
         }
 
         public override unsafe void SetComponent(void* destination, object component) => *(T*)destination = (T)component;
+
+        private static bool IsZeroSize(Type type)
+        {
+            var zeroSize = type.IsValueType && !type.IsPrimitive &&
+                type.GetFields((BindingFlags)0x34).All(fi => IsZeroSize(fi.FieldType));
+            return zeroSize;
+        }
     }
 }
 

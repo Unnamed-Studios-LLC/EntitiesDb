@@ -1,24 +1,26 @@
 # EntitiesDb
 In memory Entity Component Database. Supports queries, enumeration, multi-threading, and events.
 
-## Setup
+## Nuget
 
-Install via nuget: [UnnamedStudios.EntitiesDb](https://www.nuget.org/packages/UnnamedStudios.EntitiesDb)
+[UnnamedStudios.EntitiesDb](https://www.nuget.org/packages/UnnamedStudios.EntitiesDb)
 
-## Adding and Removing Entities
+## Components and Entities
 
-All entity structural methods **cannot be called** during a ForEach enumerator or an Event
+### Components
 
-### Entity Layout
+Components are used to store data and must be blittable types (`where T : unmanaged`).
+They cannot contain reference types. When this constraint is applied, 
+enumeration can take advatage of cache-friendly component packing.
 
-Adding or Removing components must be done with **EntityLayout**.
+#### Struct Examples
 
 ```c#
 struct Position
 {
     public float X;
     public float Y;
-	
+    
     public Position(float x, float y) => (X, Y) = (x, y);
 }
 
@@ -26,57 +28,69 @@ struct Size
 {
     public float Width;
     public float Height;
-	
+    
     public Size(float width, float height) => (Width, Height) = (width, height);
 }
 
-// example code
-EntityDatabase entityDatabase;
+struct Velocity
+{
+    public float Dx;
+    public float Dy;
+    
+    public Position(float dx, float dy) => (Dx, Dy) = (dx, dy);
+}
+```
 
-// build an EntityLayout via EntityLayoutBuilder fluent api
-// an EntityLayout may be stored and reused for multiple entities (recommended)
-var entityLayout = EntityLayoutBuilder.Create()
-    .Add<Position>()
-    .Add<Size>()
-    .Build();
-	
-// define component data
-entityLayout.Set(new Position(10, 25));
-entityLayout.Set(new Size(10, 25));
+### Entities
 
-// create entity
-uint entityId;
+Entities are represented by **entity ids**. An entity id is a unique `uint` value that
+can be used as your key to access entity component values.
 
-// directly
-entityId = entityDatabase.CreateEntity(entityLayout);
+### Create
 
-// indirectly
-entityId = entityDatabase.CreateEntity(); // creates an empty entity
-entityDatabase.ApplyLayout(entityLayout);
+```c#
+// create entity with auto-generated id
+var entityId = entityDatabase.CreateEntity();
+entityDatabase.AddComponent(entityId, new Position(50, 50));
+entityDatabase.AddComponent(entityId, new Size(100, 100));
+
+// create entity with a given id (id must not be taken)
+var entityId = entityDatabase.CreateEntity(123);
+entityDatabase.AddComponent(entityId, new Position(50, 50));
+entityDatabase.AddComponent(entityId, new Size(100, 100));
+```
+
+### EntityLayout
+
+AddComponent and RemoveComponent methods requires copying an entire entities component data for each call.
+To avoid this and perform Add/Remove operations in batch, you can use EntityLayout. EntityLayouts may be
+cached and reused.
+
+```c#
+var entityLayout = new EntityLayout();
+entityLayout.Add(entityId, new Position(50, 50));
+entityLayout.Add(entityId, new Size(100, 100));
+
+// apply layout
+entityDatabase.ApplyLayout(existingEntityId, entityLayout);
+
+// create entity with layout
+var entityId = entityDatabase.CreateEntity(entityLayout);
 ```
 
 ### Clone
 
-Entities may also be created by cloning an existing entity
+Entities may also be created by cloning an existing entity.
+All component data on the existing entity is copied into the new entity.
 
 ```c#
-// example code
-EntityDatabase entityDatabase;
-uint existingEntityId;
-
-// clone entity
 var entityId = entityDatabase.CloneEntity(existingEntityId);
 ```
 
 ### Destroy
 
 ```c#
-// example code
-EntityDatabase entityDatabase;
-uint existingEntityId;
-
-// destroy entity
-var destroyed = entityDatabase.DestroyEntity(existingEntityId);
+entityDatabase.DestroyEntity(existingEntityId);
 ```
 
 ### Tags and Empty components
@@ -84,38 +98,25 @@ var destroyed = entityDatabase.DestroyEntity(existingEntityId);
 Empty components are considered **Tags** and do not store or take up space in a data chunk.
 Tags may be used to help sort entitities for better queries.
 
+```c#
+struct Player { }
+struct Enemy { }
+```
+
 ## Enumeration
 
 ForEach is the *magic* of an entity database.
 Entities with the same component structure are stored immediately next to each other.
-This allows the ForEach operation to be cache-safe, maximizing cache line usage.
+This allows the ForEach operation to be cache-friendly, maximizing cache line usage.
 
 ### ForEach
 ```c#
-struct Position
-{
-    public float X;
-    public float Y;
-	
-    public Position(float x, float y) => (X, Y) = (x, y);
-}
-
-struct Velocity
-{
-    public float Dx;
-    public float Dy;
-	
-    public Position(float dx, float dy) => (Dx, Dy) = (dx, dy);
-}
-
-// example code
-EntityDatabase entityDatabase;
-float timeDelta = 0.01f;
+Time.Delta = 0.01f;
 
 // component ForEach
 entityDatabase.ForEach((ref Position position, ref Velocity velocity) => {
-    position.X += velocity.Dx * timeDelta;
-    position.Y += velocity.Dy * timeDelta;
+    position.X += velocity.Dx * Time.Delta;
+    position.Y += velocity.Dy * Time.Delta;
 });
 
 // id component ForEach
@@ -161,30 +162,12 @@ struct Health
     public Health(int current, int max) => (Current, Max) = (current, max);
 }
 
-struct Position
-{
-    public float X;
-    public float Y;
-	
-    public Position(float x, float y) => (X, Y) = (x, y);
-}
-
-struct Velocity
-{
-    public float Dx;
-    public float Dy;
-	
-    public Position(float dx, float dy) => (Dx, Dy) = (dx, dy);
-}
-
-// example code
-EntityDatabase entityDatabase;
-float timeDelta = 0.01f;
+Time.Delta = 0.01f;
 
 // only update positions that aren't locked
 entityDatabase.No<Locked>().ForEach((ref Position position, ref Velocity velocity) => {
-    position.X += velocity.Dx * timeDelta;
-    position.Y += velocity.Dy * timeDelta;
+    position.X += velocity.Dx * Time.Delta;
+    position.Y += velocity.Dy * Time.Delta;
 });
 
 // heal players and npcs
@@ -216,13 +199,12 @@ entityDatabase.ForEach((ref Camera camera) => {
 });
 ```
 
-### ParallelForEach
+### Parallel and Multi-threading
 
 All **ForEach** methods also contain an equivalant **ParallelForEach** method.
 
 ParallelForEach will work to split the enumeration job across available threads.
-If ParallelForEach is called within an already Parallel options, the enumeration will default to Foreach behavior.
-The ParallelOptions may be set via `EntityDatabase.ParallelOptions`
+If ParallelForEach is called within an already Parallel enumeration, the enumeration will default to ForEach behavior.
 
 ## Events
 
@@ -234,25 +216,33 @@ struct Component
     public int Value;
 }
 
-void OnAdd(uint entityId, ref Component component) { }
-void OnRemove(uint entityId, ref Component component) { }
-
-// example code
-EntityDatabase entityDatabase;
+void OnAddEntity(uint entityId) { }
+void OnAddComponent(uint entityId, ref Component component) { }
+void OnRemoveEntity(uint entityId) { }
+void OnRemoveComponent(uint entityId, ref Component component) { }
 
 // subscribe
-entityDatabase.Subscribe(Event.OnAdd, OnAdd);
-entityDatabase.Subscribe(Event.OnRemove, OnAdd);
+entityDatabase.AddEntityEvent(Event.OnAdd, OnAddEntity);
+entityDatabase.AddComponentEvent(Event.OnAdd, OnAddComponent);
+entityDatabase.AddEntityEvent(Event.OnRemove, OnRemoveEntity);
+entityDatabase.AddComponentEvent(Event.OnRemove, OnRemoveComponent);
 
 // unsubscribe
-entityDatabase.Unsubscribe(Event.OnAdd, OnAdd);
-entityDatabase.Unsubscribe(Event.OnRemove, OnAdd);
+entityDatabase.RemoveEntityEvent(Event.OnAdd, OnAddEntity);
+entityDatabase.RemoveComponentEvent(Event.OnAdd, OnAddComponent);
+entityDatabase.RemoveEntityEvent(Event.OnRemove, OnRemoveEntity);
+entityDatabase.RemoveComponentEvent(Event.OnRemove, OnRemoveComponent);
 ```
 
 ### Triggers
-Component **OnAdd** and **OnRemove** are only called during when a structural change occurs for an entity.
+Component **OnAdd** and **OnRemove** are only called when a structural change occurs for an entity.
 If a layout add is applied and the entity already contains the component, then **OnAdd** event is not triggered.
 
 ### Exception Handling
-Exceptions that occur during an event **do not effect the operation**, but they will stop subsequent events of the same component to not trigger.
-Exceptions thrown from events can be viewed by checking the `EntityDatabase.EventExceptions` list after a structural operation.
+Event exceptions can cause undesirable behavior within your application, blocking Destroy or Remove calls. 
+Properly debug exceptions thrown from events to ensure fluid behavior.
+
+## Read Only
+
+During an enumeration method (ForEach, ParallelForEach) or an event call, all entities and events are set to read-only.
+When read-only, entities, components, and events cannot be added or removed.
