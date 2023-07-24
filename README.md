@@ -128,17 +128,6 @@ entityDatabase.ForEach((uint entityId, ref Position position, ref Velocity veloc
 	
     // do something with entityId
 });
-
-// entity ForEach
-// slower operation and should be used only when component functions cannot be
-entityDatabase.ForEach((in Entity entity) => {
-    ref var position = entitiy.GetComponent<Position>();
-    ref var velocity = entitiy.GetComponent<Velocity>();
-    position.X += velocity.Dx * Time.Delta;
-    position.Y += velocity.Dy * Time.Delta;
-	
-    var entityId = entity.Id;
-});
 ```
 
 ### Filters
