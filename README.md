@@ -68,8 +68,9 @@ cached and reused.
 
 ```c#
 var entityLayout = new EntityLayout();
-entityLayout.Add(entityId, new Position(50, 50));
-entityLayout.Add(entityId, new Size(100, 100));
+entityLayout.Add(new Position(50, 50));
+entityLayout.Add(new Size(100, 100));
+entityLayout.Remove<Velocity>();
 
 // apply layout
 entityDatabase.ApplyLayout(existingEntityId, entityLayout);
@@ -122,8 +123,8 @@ entityDatabase.ForEach((ref Position position, ref Velocity velocity) => {
 // id component ForEach
 // the entity id may be added as the first parameter of the query function
 entityDatabase.ForEach((uint entityId, ref Position position, ref Velocity velocity) => {
-    position.X += velocity.Dx * timeDelta;
-    position.Y += velocity.Dy * timeDelta;
+    position.X += velocity.Dx * Time.Delta;
+    position.Y += velocity.Dy * Time.Delta;
 	
     // do something with entityId
 });
@@ -133,8 +134,8 @@ entityDatabase.ForEach((uint entityId, ref Position position, ref Velocity veloc
 entityDatabase.ForEach((in Entity entity) => {
     ref var position = entitiy.GetComponent<Position>();
     ref var velocity = entitiy.GetComponent<Velocity>();
-    position.X += velocity.Dx * timeDelta;
-    position.Y += velocity.Dy * timeDelta;
+    position.X += velocity.Dx * Time.Delta;
+    position.Y += velocity.Dy * Time.Delta;
 	
     var entityId = entity.Id;
 });
