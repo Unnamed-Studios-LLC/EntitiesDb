@@ -520,6 +520,15 @@ namespace EntitiesDb
             return true;
         }
 
+        /// <summary>
+        /// Trys to get a component for a given entity.
+        /// If the component is not found, the returned ref is invalid and should not be used.
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="entityId">Id of the entity</param>
+        /// <param name="found">If the component was found</param>
+        /// <returns>Reference to the component</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
         public ref T TryGetComponent<T>(uint entityId, out bool found) where T : unmanaged
         {
             if (!_entityReferences.TryGetValue(entityId, out var entityReference))

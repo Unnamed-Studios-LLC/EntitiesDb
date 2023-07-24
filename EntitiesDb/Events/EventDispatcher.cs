@@ -41,31 +41,31 @@ namespace EntitiesDb
             OnRemove?.Invoke(entityId);
         }
 
-        public void AddComponentEvent<T>(EventAction eventAction, ComponentHandler<T> handler) where T : unmanaged
+        public void AddComponentEvent<T>(Event eventAction, ComponentHandler<T> handler) where T : unmanaged
         {
             if (handler is null) throw new ArgumentNullException(nameof(handler));
             var componentEvents = GetComponentEvents<T>();
             switch (eventAction)
             {
-                case EventAction.Add:
+                case Event.OnAdd:
                     componentEvents.OnAdd += handler;
                     break;
-                case EventAction.Remove:
+                case Event.OnRemove:
                     componentEvents.OnRemove += handler;
                     break;
             }
         }
 
-        public void RemoveComponentEvent<T>(EventAction eventAction, ComponentHandler<T> handler) where T : unmanaged
+        public void RemoveComponentEvent<T>(Event eventAction, ComponentHandler<T> handler) where T : unmanaged
         {
             if (handler is null) throw new ArgumentNullException(nameof(handler));
             var componentEvents = GetComponentEvents<T>();
             switch (eventAction)
             {
-                case EventAction.Add:
+                case Event.OnAdd:
                     componentEvents.OnAdd -= handler;
                     break;
-                case EventAction.Remove:
+                case Event.OnRemove:
                     componentEvents.OnRemove -= handler;
                     break;
             }

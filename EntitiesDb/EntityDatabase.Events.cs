@@ -4,12 +4,12 @@ namespace EntitiesDb
 {
     public partial class EntityDatabase
     {
-        public void AddComponentEvent<T>(EventAction eventAction, ComponentHandler<T> handler) where T : unmanaged
+        public void AddComponentEvent<T>(Event eventAction, ComponentHandler<T> handler) where T : unmanaged
         {
             _eventDispatcher.AddComponentEvent(eventAction, handler);
         }
 
-        public void AddEntityEvent(EventAction eventAction, EntityHandler handler)
+        public void AddEntityEvent(Event eventAction, EntityHandler handler)
         {
             if (handler is null)
             {
@@ -18,21 +18,21 @@ namespace EntitiesDb
 
             switch (eventAction)
             {
-                case EventAction.Add:
+                case Event.OnAdd:
                     _eventDispatcher.OnAdd += handler;
                     break;
-                case EventAction.Remove:
+                case Event.OnRemove:
                     _eventDispatcher.OnRemove += handler;
                     break;
             }
         }
 
-        public void RemoveComponentEvent<T>(EventAction eventAction, ComponentHandler<T> handler) where T : unmanaged
+        public void RemoveComponentEvent<T>(Event eventAction, ComponentHandler<T> handler) where T : unmanaged
         {
             _eventDispatcher.RemoveComponentEvent(eventAction, handler);
         }
 
-        public void RemoveEntityEvent(EventAction eventAction, EntityHandler handler)
+        public void RemoveEntityEvent(Event eventAction, EntityHandler handler)
         {
             if (handler is null)
             {
@@ -41,10 +41,10 @@ namespace EntitiesDb
 
             switch (eventAction)
             {
-                case EventAction.Add:
+                case Event.OnAdd:
                     _eventDispatcher.OnAdd -= handler;
                     break;
-                case EventAction.Remove:
+                case Event.OnRemove:
                     _eventDispatcher.OnRemove -= handler;
                     break;
             }
