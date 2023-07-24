@@ -35,6 +35,8 @@ namespace EntitiesDb
 
         public abstract object GetComponent(void* source);
 
+		public abstract bool IsInstanceOfType(object value);
+
 		public abstract void OnAddComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex);
 
 		public abstract void OnRemoveComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex);
@@ -72,6 +74,8 @@ namespace EntitiesDb
 
         public override unsafe object GetComponent(void* source) => *(T*)source;
 
+        public override bool IsInstanceOfType(object value) => value is T;
+
         public override void OnAddComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex)
         {
 			ref var component = ref Empty;
@@ -90,8 +94,10 @@ namespace EntitiesDb
 
         private static bool IsZeroSize(Type type)
         {
-            var zeroSize = type.IsValueType && !type.IsPrimitive &&
-                type.GetFields((BindingFlags)0x34).All(fi => IsZeroSize(fi.FieldType));
+            var zeroSize = type.IsValueType &&
+				!type.IsPrimitive &&
+                type.GetFields((BindingFlags)0x34)
+				.All(fi => IsZeroSize(fi.FieldType));
             return zeroSize;
         }
     }

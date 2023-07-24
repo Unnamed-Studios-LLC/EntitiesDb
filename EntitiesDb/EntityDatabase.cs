@@ -101,11 +101,17 @@ namespace EntitiesDb
         /// </summary>
         /// <param name="entityId">Id of the entity altered</param>
         /// <param name="entityLayout"></param>
+        /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ReadOnlyException"></exception>
         /// <exception cref="EntityNotFoundException"></exception>
         /// <exception cref="EventException"></exception>
         public void ApplyLayout(uint entityId, EntityLayout entityLayout)
         {
+            if (entityLayout is null)
+            {
+                throw new ArgumentNullException(nameof(entityLayout));
+            }
+
             if (ReadOnly)
             {
                 throw new ReadOnlyException();
@@ -249,11 +255,17 @@ namespace EntitiesDb
         /// </summary>
         /// <param name="entityLayout">The layout to apply to the new entity</param>
         /// <returns>Id of the created entity</returns>
+        /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ReadOnlyException"></exception>
         /// <exception cref="EntityMaxException"></exception>
         /// <exception cref="EventException"></exception>
         public uint CreateEntity(EntityLayout entityLayout)
         {
+            if (entityLayout is null)
+            {
+                throw new ArgumentNullException(nameof(entityLayout));
+            }
+
             if (ReadOnly)
             {
                 throw new ReadOnlyException();
@@ -315,11 +327,17 @@ namespace EntitiesDb
         /// <param name="entityId">Id to assign to the new entity</param>
         /// <param name="entityLayout">The layout to apply to the new entity</param>
         /// <returns>Id of the created entity</returns>
+        /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ReadOnlyException"></exception>
         /// <exception cref="EntityConflictException"></exception>
         /// <exception cref="EventException"></exception>
         public uint CreateEntity(uint entityId, EntityLayout entityLayout)
         {
+            if (entityLayout is null)
+            {
+                throw new ArgumentNullException(nameof(entityLayout));
+            }
+
             if (ReadOnly)
             {
                 throw new ReadOnlyException();
@@ -430,10 +448,41 @@ namespace EntitiesDb
         }
 
         /// <summary>
-        /// Gets the types for components on an entity
+        /// Returns an object containing the component value for an entity.
         /// </summary>
         /// <param name="entityId">Id of the entity</param>
-        /// <returns>Types for components on the given entity</returns>
+        /// <param name="componentType">Type of the component</param>
+        /// <returns>Component value for the given entity.</returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="ComponentNotFoundException"></exception>
+        public object GetComponent(uint entityId, Type componentType)
+        {
+            if (componentType is null)
+            {
+                throw new ArgumentNullException(nameof(componentType));
+            }
+
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            if (!entityReference.Archetype.TryGetListOffset(componentType, out var listOffset))
+            {
+                throw new ComponentNotFoundException(entityId, componentType);
+            }
+
+            var metaData = ComponentMetaData.All[componentType];
+            var chunk = entityReference.GetChunk();
+            return metaData.GetComponent(chunk, listOffset, entityReference.Indices.ListIndex);
+        }
+
+        /// <summary>
+        /// Gets the types of the components for an entity
+        /// </summary>
+        /// <param name="entityId">Id of the entity</param>
+        /// <returns>Types of the components for the given entity</returns>
         /// <exception cref="EntityNotFoundException"></exception>
         public IEnumerable<Type> GetComponentTypes(uint entityId)
         {
@@ -467,17 +516,23 @@ namespace EntitiesDb
         /// </summary>
         /// <typeparam name="T">Component type</typeparam>
         /// <param name="entityId">Id of the entity</param>
-        /// <param name="type">The type to check</param>
+        /// <param name="componentType">The type to check</param>
         /// <returns>If the entity has the given component type</returns>
+        /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="EntityNotFoundException"></exception>
-        public bool HasComponent(uint entityId, Type type)
+        public bool HasComponent(uint entityId, Type componentType)
         {
+            if (componentType is null)
+            {
+                throw new ArgumentNullException(nameof(componentType));
+            }
+
             if (!_entityReferences.TryGetValue(entityId, out var entityReference))
             {
                 throw new EntityNotFoundException(entityId);
             }
 
-            return entityReference.Archetype.ContainsType(type);
+            return entityReference.Archetype.ContainsType(componentType);
         }
 
         /// <summary>
@@ -518,6 +573,43 @@ namespace EntitiesDb
             var newArchetype = GetArchetype(destinationMask);
             MoveEntity(entityId, entityReference, newArchetype);
             return true;
+        }
+
+        /// <summary>
+        /// Set the component value for an entity.
+        /// </summary>
+        /// <param name="entityId">Id of the entity</param>
+        /// <param name="componentType">Type of the component</param>
+        /// <param name="componente">Component value of given component type</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="ComponentNotFoundException"></exception>
+        /// <exception cref="InstanceTypeException"></exception>
+        public void SetComponent(uint entityId, Type componentType, object component)
+        {
+            if (componentType is null)
+            {
+                throw new ArgumentNullException(nameof(componentType));
+            }
+
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            if (!entityReference.Archetype.TryGetListOffset(componentType, out var listOffset))
+            {
+                throw new ComponentNotFoundException(entityId, componentType);
+            }
+
+            var metaData = ComponentMetaData.All[componentType];
+            if (!metaData.IsInstanceOfType(component))
+            {
+                throw new InstanceTypeException(componentType, component);
+            }
+
+            var chunk = entityReference.GetChunk();
+            metaData.SetComponent(chunk, listOffset, entityReference.Indices.ListIndex, component);
         }
 
         /// <summary>
