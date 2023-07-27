@@ -535,6 +535,12 @@ namespace EntitiesDb
         }
 
         /// <summary>
+        /// Registers a component type, can be used to ensure deterministic component ordering
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        public void RegisterType<T>() where T : unmanaged => GetTypeId(typeof(T));
+
+        /// <summary>
         /// Removes a component for a given entity if the entity contains the component
         /// </summary>
         /// <typeparam name="T">Component type</typeparam>
