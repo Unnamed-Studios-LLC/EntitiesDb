@@ -5,10 +5,10 @@ namespace EntitiesDb;
 [AttributeUsage(AttributeTargets.Struct)]
 public sealed class BufferAttribute : Attribute
 {
-    public BufferAttribute(int chunkMax = 2)
+    public BufferAttribute(int internalCapacity)
     {
-        ChunkMax = chunkMax;
+        InternalCapacity = internalCapacity;
     }
 
-    public int ChunkMax { get; }
+    public int InternalCapacity { get; }
 }

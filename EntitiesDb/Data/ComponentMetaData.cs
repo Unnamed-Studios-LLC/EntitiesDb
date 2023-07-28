@@ -13,7 +13,7 @@ namespace EntitiesDb
 		{
 			Type = type;
 			Size = size;
-			Buffer = buffer;
+			InternalCapacity = buffer;
 		}
 
 		/// <summary>
@@ -27,9 +27,9 @@ namespace EntitiesDb
 		public int Size { get; }
 
 		/// <summary>
-		/// The buffer size of the component
+		/// The internal buffer capacity of the component
 		/// </summary>
-		public int Buffer { get; }
+		public int InternalCapacity { get; }
 
 		public abstract object CreateDefault();
 
@@ -100,8 +100,8 @@ namespace EntitiesDb
 
         private static int GetBuffer(Type type)
         {
-			var buffer = type.GetCustomAttribute<BufferAttribute>();
-			return Math.Max(1, buffer?.ChunkMax ?? 1);
+			var internalCapacity = type.GetCustomAttribute<BufferAttribute>();
+			return Math.Max(1, internalCapacity?.InternalCapacity ?? 1);
         }
 
         private static bool IsZeroSize(Type type)
