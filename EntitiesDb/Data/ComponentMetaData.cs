@@ -9,10 +9,11 @@ namespace EntitiesDb
     {
         public static readonly ConcurrentDictionary<Type, ComponentMetaData> All = new();
 
-        public ComponentMetaData(Type type, int size)
+        public ComponentMetaData(Type type, int size, int buffer)
 		{
 			Type = type;
 			Size = size;
+			Buffer = buffer;
 		}
 
 		/// <summary>
@@ -24,6 +25,11 @@ namespace EntitiesDb
 		/// Size of the component in bytes
 		/// </summary>
 		public int Size { get; }
+
+		/// <summary>
+		/// The buffer size of the component
+		/// </summary>
+		public int Buffer { get; }
 
 		public abstract object CreateDefault();
 
@@ -61,7 +67,7 @@ namespace EntitiesDb
 			All[typeof(T)] = Instance;
 		}
 
-        public ComponentMetaData() : base(typeof(T), IsZeroSize(typeof(T)) ? 0 : sizeof(T))
+        public ComponentMetaData() : base(typeof(T), IsZeroSize(typeof(T)) ? 0 : sizeof(T), GetBuffer(typeof(T)))
         {
         }
 
@@ -91,6 +97,12 @@ namespace EntitiesDb
         }
 
         public override unsafe void SetComponent(void* destination, object component) => *(T*)destination = (T)component;
+
+        private static int GetBuffer(Type type)
+        {
+			var buffer = type.GetCustomAttribute<BufferAttribute>();
+			return Math.Max(1, buffer?.ChunkMax ?? 1);
+        }
 
         private static bool IsZeroSize(Type type)
         {

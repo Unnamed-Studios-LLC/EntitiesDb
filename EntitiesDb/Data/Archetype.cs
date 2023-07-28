@@ -26,7 +26,7 @@ namespace EntitiesDb
             foreach (var metaData in MetaData)
             {
                 _offsets[metaData.Type] = metaData.Size != 0 ? entitySize : -1;
-                entitySize += metaData.Size;
+                entitySize += metaData.Size * metaData.Buffer;
             }
 
             _chunkCapacity = ChunkAllocSize / entitySize;
