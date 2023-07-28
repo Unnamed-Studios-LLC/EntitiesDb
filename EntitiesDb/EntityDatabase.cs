@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -92,6 +93,70 @@ namespace EntitiesDb
             if (added)
             {
                 PublishAddEvent(entityId, ref addedComponent);
+            }
+        }
+
+        /// <summary>
+        /// Adds or replaces a component buffer
+        /// </summary>
+        /// <typeparam name="T">The component type</typeparam>
+        /// <param name="entityId">Id of the entity altered</param>
+        /// <param name="components">Components to initial the buffer with</param>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="EventException"></exception>
+        public void AddComponentBuffer<T>(uint entityId, ReadOnlySpan<T> components) where T : unmanaged
+        {
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            // bufferable check
+            var metaData = ComponentMetaData<T>.Instance;
+            if (!metaData.Bufferable)
+            {
+                throw new BufferableException(metaData.Type);
+            }
+
+            // resolve archetype
+            var added = !entityReference.Archetype.ContainsType(typeof(ComponentBuffer<T>));
+            if (added)
+            {
+                // archetype changed
+                // move entity to new archetype
+                var destinationMask = GetDestinationMaskAdd(entityReference.Archetype, typeof(T));
+                var newArchetype = GetArchetype(destinationMask);
+                entityReference = MoveEntity(entityId, entityReference, newArchetype);
+            }
+
+            // set component data
+            ref var addedBuffer = ref ComponentMetaData<ComponentBuffer<T>>.Empty;
+            if (metaData.Size != 0)
+            {
+                // only set if non-zero
+                var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
+                var listOffset = entityReference.Archetype.GetListOffset(typeof(T));
+                addedBuffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, entityReference.Indices.ListIndex);
+
+                if (!added)
+                {
+                    // we are overwriting the previous buffer, dispose it first
+                    addedBuffer.Dispose();
+                }
+
+                addedBuffer = new ComponentBuffer<T>(metaData.InternalCapacity, components);
+            }
+
+            // add event
+            if (added)
+            {
+                PublishAddEvent(entityId, ref addedBuffer);
             }
         }
 
@@ -572,6 +637,47 @@ namespace EntitiesDb
                 removedComponent = ref entityReference.GetChunk().GetComponent<T>(listOffset, entityReference.Indices.ListIndex);
             }
             PublishRemoveEvent(entityId, ref removedComponent);
+
+            // move entity to new archetype
+            var destinationMask = GetDestinationMaskRemove(entityReference.Archetype, typeof(T));
+            var newArchetype = GetArchetype(destinationMask);
+            MoveEntity(entityId, entityReference, newArchetype);
+            return true;
+        }
+
+        /// <summary>
+        /// Removes a buffer of components for a given entity if the entity contains the component buffer
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="entityId">Id of the entity</param>
+        /// <returns>If the component buffer was found and removed</returns>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
+        public bool RemoveComponentBuffer<T>(uint entityId) where T : unmanaged
+        {
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            if (!entityReference.Archetype.TryGetListOffset(typeof(ComponentBuffer<T>), out var listOffset))
+            {
+                return false;
+            }
+
+            // remove event
+            ref var removedBuffer = ref ComponentMetaData<ComponentBuffer<T>>.Empty;
+            if (listOffset >= 0)
+            {
+                removedBuffer = ref entityReference.GetChunk().GetComponent<ComponentBuffer<T>>(listOffset, entityReference.Indices.ListIndex);
+            }
+            PublishRemoveEvent(entityId, ref removedBuffer);
+            removedBuffer.Dispose();
 
             // move entity to new archetype
             var destinationMask = GetDestinationMaskRemove(entityReference.Archetype, typeof(T));

@@ -3,15 +3,22 @@ using System.Runtime.InteropServices;
 
 namespace EntitiesDb
 {
-    public unsafe ref struct ComponentBuffer<T> where T : unmanaged
+    public unsafe struct ComponentBuffer<T> : IDisposable where T : unmanaged
     {
         private readonly int _internalCapacity;
         private int _size;
         private void* _heap;
 
-        public ComponentBuffer(int internalCapacity) : this()
+        public ComponentBuffer(int internalCapacity, ReadOnlySpan<T> data) : this()
         {
             _internalCapacity = internalCapacity;
+            _size = data.Length;
+
+            if (data.Length == 0) return;
+
+            var capacity = Capacity;
+            if (capacity > _internalCapacity) _heap = Marshal.AllocHGlobal(capacity * sizeof(T)).ToPointer();
+            data.CopyTo(AsSpan());
         }
 
         private int Capacity
@@ -70,6 +77,21 @@ namespace EntitiesDb
             ((T*)Data)[_size++] = item;
         }
 
+
+        public Span<T> AsSpan() => new(Data, _size);
+
+        public void Dispose()
+        {
+            if (_size <= _internalCapacity) return;
+            _size = 0;
+            Marshal.FreeHGlobal((nint)_heap);
+        }
+
+        /// <summary>
+        /// Removes an item at a given index.
+        /// </summary>
+        /// <param name="index">The index of the item to remove.</param>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
         public void RemoveAtSwapBack(int index)
         {
             if (index < 0 || index >= _size) throw new ArgumentOutOfRangeException(nameof(index));
@@ -99,7 +121,5 @@ namespace EntitiesDb
             // assign new heap, if not internal
             if (_size != _internalCapacity) _heap = destination;
         }
-
-        public Span<T> AsSpan() => new(Data, _size);
     }
 }

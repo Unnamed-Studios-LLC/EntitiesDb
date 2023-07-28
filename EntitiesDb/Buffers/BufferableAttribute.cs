@@ -3,9 +3,9 @@
 namespace EntitiesDb;
 
 [AttributeUsage(AttributeTargets.Struct)]
-public sealed class BufferAttribute : Attribute
+public sealed class BufferableAttribute : Attribute
 {
-    public BufferAttribute(int internalCapacity)
+    public BufferableAttribute(int internalCapacity)
     {
         InternalCapacity = internalCapacity;
     }

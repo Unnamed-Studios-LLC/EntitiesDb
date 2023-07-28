@@ -9,11 +9,12 @@ namespace EntitiesDb
     {
         public static readonly ConcurrentDictionary<Type, ComponentMetaData> All = new();
 
-        public ComponentMetaData(Type type, int size, int buffer)
+        public ComponentMetaData(Type type, int size, int? internalCapacity)
 		{
 			Type = type;
 			Size = size;
-			InternalCapacity = buffer;
+			InternalCapacity = internalCapacity ?? 0;
+			Bufferable = InternalCapacity > 0;
 		}
 
 		/// <summary>
@@ -31,7 +32,12 @@ namespace EntitiesDb
 		/// </summary>
 		public int InternalCapacity { get; }
 
-		public abstract object CreateDefault();
+		/// <summary>
+		/// If this component
+		/// </summary>
+		public bool Bufferable { get; }
+
+        public abstract object CreateDefault();
 
         public object GetComponent(Chunk chunk, int listOffset, int listIndex)
 		{
@@ -67,7 +73,7 @@ namespace EntitiesDb
 			All[typeof(T)] = Instance;
 		}
 
-        public ComponentMetaData() : base(typeof(T), IsZeroSize(typeof(T)) ? 0 : sizeof(T), GetBuffer(typeof(T)))
+        public ComponentMetaData() : base(typeof(T), IsZeroSize(typeof(T)) ? 0 : sizeof(T), GetInternalCapacity(typeof(T)))
         {
         }
 
@@ -98,10 +104,11 @@ namespace EntitiesDb
 
         public override unsafe void SetComponent(void* destination, object component) => *(T*)destination = (T)component;
 
-        private static int GetBuffer(Type type)
+        private static int? GetInternalCapacity(Type type)
         {
-			var internalCapacity = type.GetCustomAttribute<BufferAttribute>();
-			return Math.Max(1, internalCapacity?.InternalCapacity ?? 1);
+			var bufferable = type.GetCustomAttribute<BufferableAttribute>();
+			if (bufferable == null || bufferable.InternalCapacity < 1) return null;
+			return bufferable.InternalCapacity;
         }
 
         private static bool IsZeroSize(Type type)
