@@ -2,8 +2,6 @@
 
 public struct EntityIdIterator
 {
-	public EntityIdIterator()
-	{
-	}
+
 }
 

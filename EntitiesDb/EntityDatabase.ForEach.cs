@@ -2,6 +2,12 @@
 {
     public sealed partial class EntityDatabase
     {
+        public QueryFilter Query()
+        {
+            var queryFilter = RentQueryFilter();
+            return queryFilter;
+        }
+
         public void ForEach<T1>(ComponentFunc<T1> func)
             where T1 : unmanaged
         {

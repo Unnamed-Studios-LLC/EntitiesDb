@@ -1,14 +1,13 @@
-﻿namespace EntitiesDb
-{
-    internal readonly struct EnumerationJob
-    {
-        public readonly Archetype Archetype;
-        public readonly int ChunkIndex;
+﻿namespace EntitiesDb;
 
-        public EnumerationJob(Archetype archetype, int chunkIndex)
-        {
-            Archetype = archetype;
-            ChunkIndex = chunkIndex;
-        }
+public readonly struct EnumerationJob
+{
+    internal readonly Archetype Archetype;
+    internal readonly int ChunkIndex;
+
+    internal EnumerationJob(Archetype archetype, int chunkIndex)
+    {
+        Archetype = archetype;
+        ChunkIndex = chunkIndex;
     }
 }

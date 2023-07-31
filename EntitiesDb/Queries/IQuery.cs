@@ -1,10 +1,6 @@
-﻿using System.Collections.Generic;
+﻿namespace EntitiesDb;
 
-namespace EntitiesDb
+public interface IQuery
 {
-    internal interface IQuery
-    {
-        void EnumerateChunk(in EnumerationJob job);
-        IEnumerable<ComponentMetaData> GetDelegateMetaData();
-    }
+    void EnumerateChunk(in EnumerationJob job);
 }
