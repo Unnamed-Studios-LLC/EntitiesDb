@@ -3,6 +3,11 @@ using System.Runtime.InteropServices;
 
 namespace EntitiesDb
 {
+    public static class ComponentBuffer
+    {
+        public const int HeaderSize = 8;
+    }
+
     public unsafe struct ComponentBuffer<T> : IDisposable where T : unmanaged
     {
         private readonly int _internalCapacity;
@@ -20,6 +25,11 @@ namespace EntitiesDb
             if (capacity > _internalCapacity) _heap = Marshal.AllocHGlobal(capacity * sizeof(T)).ToPointer();
             data.CopyTo(AsSpan());
         }
+
+        /// <summary>
+        /// The amount of items in the buffer
+        /// </summary>
+        public int Length => _size;
 
         private int Capacity
         {
@@ -46,7 +56,16 @@ namespace EntitiesDb
             }
         }
 
+        /// <summary>
+        /// <inheritdoc cref="Add(ref T)"/>
+        /// </summary>
+        /// <param name="item">Item to add</param>
         public void Add(T item) => Add(ref item);
+
+        /// <summary>
+        /// Adds an item to the buffer
+        /// </summary>
+        /// <param name="item">Item to add</param>
         public void Add(ref T item)
         {
             // only check for resize on significant size values
@@ -77,15 +96,28 @@ namespace EntitiesDb
             ((T*)Data)[_size++] = item;
         }
 
-
+        /// <summary>
+        /// Returns a span representation of the buffer.
+        /// Span should not be used after any add or remove call.
+        /// </summary>
         public Span<T> AsSpan() => new(Data, _size);
 
-        public void Dispose()
+        /// <summary>
+        /// Clears all items in the buffer
+        /// </summary>
+        public void Clear()
         {
-            if (_size <= _internalCapacity) return;
+            if (_size > _internalCapacity)
+            {
+                Marshal.FreeHGlobal((nint)_heap);
+            }
             _size = 0;
-            Marshal.FreeHGlobal((nint)_heap);
         }
+
+        /// <summary>
+        /// Disposes unmanaged resource.
+        /// </summary>
+        public void Dispose() => Clear();
 
         /// <summary>
         /// Removes an item at a given index.

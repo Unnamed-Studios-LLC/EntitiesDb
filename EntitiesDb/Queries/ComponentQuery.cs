@@ -18,13 +18,14 @@ namespace EntitiesDb
         {
             var chunk = job.Archetype.GetChunk(job.ChunkIndex);
             var count = job.Archetype.GetChunkLength(job.ChunkIndex);
-            var list1 = chunk.GetList<T1>(job.Archetype.GetListOffset(typeof(T1)));
+            var (offset1, stride1) = job.Archetype.GetListOffsetAndStride(typeof(T1));
+            var list1 = chunk.GetList(offset1);
             for (int i = 0; i < count; i++)
             {
                 _componentFunc.Invoke(
                     ref Unsafe.AsRef<T1>(list1)
                 );
-                list1++;
+                list1 += stride1;
             }
         }
 

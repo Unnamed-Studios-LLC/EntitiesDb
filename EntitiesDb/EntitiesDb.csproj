@@ -23,4 +23,10 @@
   <ItemGroup>
     <PackageReference Include="System.Memory" Version="4.5.5" />
   </ItemGroup>
+  <ItemGroup>
+    <None Remove="Iterators\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Iterators\" />
+  </ItemGroup>
 </Project>

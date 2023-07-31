@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
@@ -15,6 +16,13 @@ namespace EntitiesDb
 			Size = size;
 			InternalCapacity = internalCapacity ?? 0;
 			Bufferable = InternalCapacity > 0;
+			Stride = !Bufferable ? Size : ComponentBuffer.HeaderSize + InternalCapacity * Size;
+
+			if (type.IsConstructedGenericType &&
+				type.GetGenericTypeDefinition() == typeof(ComponentBuffer<>))
+			{
+				ComponentBufferType = type.GenericTypeArguments[0];
+			}
 		}
 
 		/// <summary>
@@ -22,10 +30,10 @@ namespace EntitiesDb
 		/// </summary>
 		public Type Type { get; }
 
-		/// <summary>
-		/// Size of the component in bytes
-		/// </summary>
-		public int Size { get; }
+        /// <summary>
+        /// Size of the component in bytes
+        /// </summary>
+        public int Size { get; }
 
 		/// <summary>
 		/// The internal buffer capacity of the component
@@ -37,11 +45,22 @@ namespace EntitiesDb
 		/// </summary>
 		public bool Bufferable { get; }
 
+		/// <summary>
+		/// If the component contains no data
+		/// </summary>
+		public bool ZeroSize => Size == 0;
+
+		public int Stride { get; }
+
+		public bool IsComponentBuffer => ComponentBufferType != null;
+
+		public Type ComponentBufferType { get; }
+
         public abstract object CreateDefault();
 
         public object GetComponent(Chunk chunk, int listOffset, int listIndex)
 		{
-			if (Size == 0) return CreateDefault();
+			if (ZeroSize) return CreateDefault();
 			return GetComponent(chunk.GetComponent(listOffset, listIndex, Size));
 		}
 
@@ -55,19 +74,22 @@ namespace EntitiesDb
 
 		public void SetComponent(Chunk chunk, int listOffset, int listIndex, object value)
 		{
-			if (Size == 0) return;
+			if (ZeroSize) return;
 			SetComponent(chunk.GetComponent(listOffset, listIndex, Size), value);
 		}
 
 		public abstract void SetComponent(void* destination, object component);
-	}
+
+		public abstract void SetComponentBuffer(Chunk chunk, int listOffset, int listIndex, object list, bool overwrite);
+    }
 
 	internal unsafe sealed class ComponentMetaData<T> : ComponentMetaData where T : unmanaged
 	{
 		public static readonly ComponentMetaData<T> Instance;
 		public static T Empty;
+        public static ComponentBuffer<T> EmptyBuffer;
 
-		static ComponentMetaData()
+        static ComponentMetaData()
 		{
 			Instance = new();
 			All[typeof(T)] = Instance;
@@ -91,14 +113,14 @@ namespace EntitiesDb
         public override void OnAddComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex)
         {
 			ref var component = ref Empty;
-			if (Size != 0) component = ref chunk.GetComponent<T>(listOffset, listIndex);
+			if (!ZeroSize) component = ref chunk.GetComponent<T>(listOffset, listIndex, Stride);
             eventDispatcher.OnAddComponent(entityId, ref component);
         }
 
         public override void OnRemoveComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex)
         {
             ref var component = ref Empty;
-            if (Size != 0) component = ref chunk.GetComponent<T>(listOffset, listIndex);
+            if (!ZeroSize) component = ref chunk.GetComponent<T>(listOffset, listIndex, Stride);
             eventDispatcher.OnRemoveComponent(entityId, ref component);
         }
 
@@ -118,6 +140,18 @@ namespace EntitiesDb
                 type.GetFields((BindingFlags)0x34)
 				.All(fi => IsZeroSize(fi.FieldType));
             return zeroSize;
+        }
+
+        public override void SetComponentBuffer(Chunk chunk, int listOffset, int listIndex, object list, bool overwrite)
+        {
+			var typedList = (List<T>)list;
+			ref var buffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, listIndex, Stride);
+			if (overwrite) buffer.Dispose();
+			buffer = new ComponentBuffer<T>(InternalCapacity, ReadOnlySpan<T>.Empty);
+			foreach (var value in typedList)
+			{
+				buffer.Add(value);
+			}
         }
     }
 }

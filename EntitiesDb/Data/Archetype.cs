@@ -9,8 +9,8 @@ namespace EntitiesDb
     {
         private const int ChunkAllocSize = 16384;
 
-        private readonly Dictionary<Type, int> _offsets = new();
-		private readonly List<Chunk> _chunks = new();
+        private readonly Dictionary<Type, (int Offset, int Stride)> _offsetsAndStrides = new();
+        private readonly List<Chunk> _chunks = new();
         private readonly int _chunkCapacity;
         private bool _disposed;
         private int _workingCount;
@@ -25,11 +25,19 @@ namespace EntitiesDb
             var entitySize = sizeof(uint);
             foreach (var metaData in MetaData)
             {
-                _offsets[metaData.Type] = metaData.Size != 0 ? entitySize : -1;
-                entitySize += metaData.Size * metaData.InternalCapacity;
+                var offset = metaData.ZeroSize ? -1 : entitySize;
+                var stride = metaData.ZeroSize ? -1 : metaData.Stride;
+                _offsetsAndStrides[metaData.Type] = (offset, stride);
+                entitySize += stride;
             }
 
             _chunkCapacity = ChunkAllocSize / entitySize;
+            foreach (var metaData in MetaData)
+            {
+                var offsetAndStride = _offsetsAndStrides[metaData.Type];
+                offsetAndStride.Offset *= _chunkCapacity;
+                _offsetsAndStrides[metaData.Type] = offsetAndStride;
+            }
         }
 
         ~Archetype() => Dispose();
@@ -72,10 +80,11 @@ namespace EntitiesDb
             _disposed = true;
         }
 
-        public bool ContainsType(Type type) => _offsets.ContainsKey(type);
+        public bool ContainsType(Type type) => _offsetsAndStrides.ContainsKey(type);
 
         public Chunk GetChunk(int index) => _chunks[index];
         public int GetChunkLength(int index) => index == _chunks.Count - 1 ? _workingCount : _chunkCapacity;
+        public int GetChunkStride(int index) => index == _chunks.Count - 1 ? _workingCount : _chunkCapacity;
 
         public uint GetLastEntityId()
         {
@@ -84,7 +93,8 @@ namespace EntitiesDb
             return lastChunk[count - 1];
         }
 
-        public int GetListOffset(Type type) => _offsets[type] * _chunkCapacity;
+        public int GetListOffset(Type type) => _offsetsAndStrides[type].Offset;
+        public (int Offset, int Stride) GetListOffsetAndStride(Type type) => _offsetsAndStrides[type];
 
         public uint Remove(EntityIndex entityIndex)
         {
@@ -111,8 +121,8 @@ namespace EntitiesDb
                 // move components
                 foreach (var metaData in MetaData)
                 {
-                    if (metaData.Size == 0) continue; // ignore zero-size components
-                    var listOffset = _offsets[metaData.Type] * _chunkCapacity;
+                    if (metaData.ZeroSize) continue; // ignore zero-size components
+                    var listOffset = _offsetsAndStrides[metaData.Type].Offset;
                     Chunk.Copy(
                         lastChunk, listOffset + lastListIndex * metaData.Size,
                         chunk, listOffset + entityIndex.ListIndex * metaData.Size,
@@ -133,8 +143,12 @@ namespace EntitiesDb
 
         public bool TryGetListOffset(Type type, out int listOffset)
         {
-            if (!_offsets.TryGetValue(type, out listOffset)) return false;
-            listOffset *= _chunkCapacity;
+            if (!_offsetsAndStrides.TryGetValue(type, out var offsetAndStride))
+            {
+                listOffset = default;
+                return false;
+            }
+            listOffset = offsetAndStride.Offset;
             return true;
         }
     }

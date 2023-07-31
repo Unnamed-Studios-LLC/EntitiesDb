@@ -27,14 +27,19 @@ namespace EntitiesDb
 			);
         }
 
-        public byte* GetComponent(int listOffset, int listIndex, int size)
+        public byte* GetComponent(int listOffset, int listIndex, int stride)
         {
-			return (byte*)Data + listOffset + listIndex * size;
+			return (byte*)Data + listOffset + listIndex * stride;
         }
 
-		public ref T GetComponent<T>(int listOffset, int listIndex) where T : unmanaged
+		public ref T GetComponent<T>(int listOffset, int listIndex, int stride) where T : unmanaged
 		{
-            return ref Unsafe.AsRef<T>(GetComponent(listOffset, listIndex, sizeof(T)));
+            return ref Unsafe.AsRef<T>(GetComponent(listOffset, listIndex, stride));
+        }
+
+        public byte* GetList(int listOffset)
+        {
+            return (byte*)Data + listOffset;
         }
 
         public T* GetList<T>(int listOffset) where T : unmanaged
