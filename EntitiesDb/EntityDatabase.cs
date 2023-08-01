@@ -1,14 +1,12 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace EntitiesDb
 {
-    public sealed partial class EntityDatabase : IQueryable
+    public sealed class EntityDatabase : IQueryable
     {
         /// <summary>
         /// The maximum amount of entities that can be stored in one <see cref="EntityDatabase"/>
@@ -170,6 +168,40 @@ namespace EntitiesDb
             if (added)
             {
                 PublishAddEvent(entityId, ref addedComponent);
+            }
+        }
+
+        /// <summary>
+        /// Adds a component event handler for a given Event
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="eventAction">Event trigger</param>
+        /// <param name="handler">Component handler</param>
+        public void AddEvent<T>(Event eventAction, ComponentHandler<T> handler) where T : unmanaged
+        {
+            _eventDispatcher.AddComponentEvent(eventAction, handler);
+        }
+
+        /// <summary>
+        /// Adds an entity event handler for a given Event
+        /// </summary>
+        /// <param name="eventAction">Event trigger</param>
+        /// <param name="handler">Entity handler</param>
+        public void AddEvent(Event eventAction, EntityHandler handler)
+        {
+            if (handler is null)
+            {
+                throw new ArgumentNullException(nameof(handler));
+            }
+
+            switch (eventAction)
+            {
+                case Event.OnAdd:
+                    _eventDispatcher.OnAdd += handler;
+                    break;
+                case Event.OnRemove:
+                    _eventDispatcher.OnRemove += handler;
+                    break;
             }
         }
 
@@ -760,6 +792,40 @@ namespace EntitiesDb
             var newArchetype = GetArchetype(destinationMask);
             MoveEntity(entityId, entityReference, newArchetype);
             return true;
+        }
+
+        /// <summary>
+        /// Removes a component event handler for a given event
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="eventAction">Event trigger</param>
+        /// <param name="handler">Component handler</param>
+        public void RemoveEvent<T>(Event eventAction, ComponentHandler<T> handler) where T : unmanaged
+        {
+            _eventDispatcher.RemoveComponentEvent(eventAction, handler);
+        }
+
+        /// <summary>
+        /// Removes an entity event handler for a given event
+        /// </summary>
+        /// <param name="eventAction">Event trigger</param>
+        /// <param name="handler">Entity handler</param>
+        public void RemoveEvent(Event eventAction, EntityHandler handler)
+        {
+            if (handler is null)
+            {
+                throw new ArgumentNullException(nameof(handler));
+            }
+
+            switch (eventAction)
+            {
+                case Event.OnAdd:
+                    _eventDispatcher.OnAdd -= handler;
+                    break;
+                case Event.OnRemove:
+                    _eventDispatcher.OnRemove -= handler;
+                    break;
+            }
         }
 
         /// <summary>
