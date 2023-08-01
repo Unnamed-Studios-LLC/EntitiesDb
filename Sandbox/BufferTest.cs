@@ -19,7 +19,7 @@ public class BufferTest
         for (int i = 0; i < 10_000; i++)
         {
             var r = random.Next();
-            layout.Add<Component>(new Component
+            layout.AddComponent<Component>(new Component
             {
                 ValueA = r,
                 ValueB = r + 1
@@ -49,22 +49,26 @@ public class BufferTest
     [Benchmark]
     public void Test()
     {
-
-        _entities?.ForEach((ref Component component, ref ComponentBuffer<BufferedComponent> bufferedComponents) =>
+        var state = 5;
+        _entities?.GetQueryFilter().ForEach(state, static (uint entityId, ref Component component, ref ComponentBuffer<BufferedComponent> bufferedComponents, ref int state) =>
         {
+            var bufferSpan = bufferedComponents.GetSpan();
+            foreach (ref var bufferComponent in bufferSpan)
+            {
 
+            }
         });
     }
 }
 
-file struct Component
+public struct Component
 {
     public int ValueA;
     public int ValueB;
 }
 
 [Bufferable(8)]
-file struct BufferedComponent
+public struct BufferedComponent
 {
     public int ValueA;
 }

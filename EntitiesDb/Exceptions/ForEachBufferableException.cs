@@ -4,7 +4,7 @@ namespace EntitiesDb;
 
 public sealed class ForEachBufferableException : Exception
 {
-	public ForEachBufferableException(Type componentType) : base($"Bufferable types cannot be used outside of ComponentBuffer<T> as ForEach ref parameter, component type: {componentType}")
+	public ForEachBufferableException(Type componentType) : base($"Components marked with Bufferable attribute must be wrapped by ComponentBuffer<T> in ForEach delegates, component type: {componentType}")
 	{
         ComponentType = componentType;
     }

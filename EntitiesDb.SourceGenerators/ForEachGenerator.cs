@@ -1,5 +1,5 @@
 ﻿using System.Collections.Immutable;
-using System.Diagnostics;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -11,40 +11,62 @@ internal sealed class ForEachGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var callsites = context.SyntaxProvider.CreateSyntaxProvider(FindNodes, ProcessNodes)
-            .Where(x => x != null);
+            .Where(x => x != null)
+            .WithComparer(SymbolEqualityComparer.Default);
         context.RegisterSourceOutput(callsites.Collect(), Generate!);
     }
 
-    private static bool FindNodes(SyntaxNode syntaxNode, CancellationToken cancellationToken) => syntaxNode switch
+    private static bool FindNodes(SyntaxNode syntaxNode, CancellationToken cancellationToken)
     {
-        FunctionPointerCallingConventionSyntax => true,
-        _ => false
-    };
-
-    private static void Generate(SourceProductionContext context, ImmutableArray<FunctionPointerCallingConventionSyntax> callsites)
-    {
-        if (!Debugger.IsAttached)
+        return syntaxNode switch
         {
-            Debugger.Launch();
-        }
+            InvocationExpressionSyntax => true,
+            _ => false
+        };
+    }
 
-        foreach (var callsite in callsites)
+    private static void Generate(SourceProductionContext context, ImmutableArray<IMethodSymbol> methods)
+    {
+        var uniqueMethods = methods.ToImmutableHashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        var stringBuilder = new StringBuilder();
+        foreach (var method in uniqueMethods)
         {
             if (context.CancellationToken.IsCancellationRequested) return;
-            callsite.ToFullString();
+            var source = ForEachTemplates.Create(method, stringBuilder, out var uniqueName);
             if (context.CancellationToken.IsCancellationRequested) return;
 
-            /*
-            var displayName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var fileName = $"{displayName.Replace("global::", "")}MetaData.g";
+            var fileName = $"{uniqueName}.g";
             context.AddSource(fileName, source);
-            */
         }
     }
 
-    private static FunctionPointerCallingConventionSyntax? ProcessNodes(GeneratorSyntaxContext syntaxContext, CancellationToken cancellationToken) => syntaxContext.Node switch
+    private static IMethodSymbol? GetMethodSymbol(GeneratorSyntaxContext syntaxContext, CancellationToken cancellationToken)
     {
-        FunctionPointerCallingConventionSyntax x => x,
+        if (syntaxContext.Node is not InvocationExpressionSyntax invocationExpressionSyntax) return null;
+        var symbolInfo = syntaxContext.SemanticModel.GetSymbolInfo(invocationExpressionSyntax.Expression);
+        var symbol = symbolInfo.Symbol;
+        if (symbol == null ||
+            symbol is not IMethodSymbol methodSymbol) return null;
+
+        // method name check
+        if (!methodSymbol.Name.Equals(Names.ForEachName, StringComparison.Ordinal)) return null;
+
+        // type check
+        var containingType = methodSymbol.ContainingType;
+        if (containingType == null ||
+            !containingType.Name.Equals(Names.ForEachExtensionsName, StringComparison.Ordinal)) return null;
+
+        // namespace check
+        var containingNamespace = methodSymbol.ContainingNamespace;
+        if (containingNamespace == null ||
+            !containingNamespace.Name.Equals(Names.EntitiesDbName, StringComparison.Ordinal)) return null;
+
+        return methodSymbol;
+    }
+
+    private static IMethodSymbol? ProcessNodes(GeneratorSyntaxContext syntaxContext, CancellationToken cancellationToken) => syntaxContext.Node switch
+    {
+        InvocationExpressionSyntax => GetMethodSymbol(syntaxContext, cancellationToken),
         _ => null
     };
 }

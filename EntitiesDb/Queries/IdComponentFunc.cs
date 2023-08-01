@@ -79,14 +79,14 @@
 
     public delegate void IdComponentStateFunc<TState>(
             uint entityId,
-            TState state
+            ref TState state
         )
         ;
 
     public delegate void IdComponentStateFunc<T1, TState>(
             uint entityId,
             ref T1 componentA,
-            TState state
+            ref TState state
         )
         where T1 : unmanaged
         ;
@@ -95,7 +95,7 @@
             uint entityId,
             ref T1 componentA,
             ref T2 componentB,
-            TState state
+            ref TState state
         )
         where T1 : unmanaged
         where T2 : unmanaged
@@ -106,7 +106,7 @@
             ref T1 componentA,
             ref T2 componentB,
             ref T3 componentC,
-            TState state
+            ref TState state
         )
         where T1 : unmanaged
         where T2 : unmanaged
@@ -119,7 +119,7 @@
             ref T2 componentB,
             ref T3 componentC,
             ref T4 componentD,
-            TState state
+            ref TState state
         )
         where T1 : unmanaged
         where T2 : unmanaged
@@ -134,7 +134,7 @@
             ref T3 componentC,
             ref T4 componentD,
             ref T5 componentE,
-            TState state
+            ref TState state
         )
         where T1 : unmanaged
         where T2 : unmanaged
@@ -151,7 +151,7 @@
             ref T4 componentD,
             ref T5 componentE,
             ref T6 componentF,
-            TState state
+            ref TState state
         )
         where T1 : unmanaged
         where T2 : unmanaged

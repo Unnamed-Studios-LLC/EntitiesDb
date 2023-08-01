@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace EntitiesDb
@@ -14,7 +15,14 @@ namespace EntitiesDb
         private int _size;
         private void* _heap;
 
-        public ComponentBuffer(int internalCapacity, ReadOnlySpan<T> data) : this()
+        internal ComponentBuffer(int internalCapacity, int size, void* heap)
+        {
+            _internalCapacity = internalCapacity;
+            _size = size;
+            _heap = heap;
+        }
+
+        internal ComponentBuffer(int internalCapacity, ReadOnlySpan<T> data)
         {
             _internalCapacity = internalCapacity;
             _size = data.Length;
@@ -23,7 +31,17 @@ namespace EntitiesDb
 
             var capacity = Capacity;
             if (capacity > _internalCapacity) _heap = Marshal.AllocHGlobal(capacity * sizeof(T)).ToPointer();
-            data.CopyTo(AsSpan());
+            else _heap = default;
+            data.CopyTo(GetSpan());
+        }
+
+        public ref T this[int index]
+        {
+            get
+            {
+                if (index < 0 || index >= _size) throw new ArgumentOutOfRangeException(nameof(index));
+                return ref Unsafe.AsRef<T>((T*)Data + index);
+            }
         }
 
         /// <summary>
@@ -82,7 +100,7 @@ namespace EntitiesDb
                     var destination = Marshal.AllocHGlobal(newHeapSize).ToPointer();
 
                     // copy items
-                    Buffer.MemoryCopy(source, destination, newHeapSize, newHeapSize);
+                    Buffer.MemoryCopy(source, destination, newHeapSize, capacity * sizeof(T));
 
                     // free old heap
                     if (_size != _internalCapacity) Marshal.FreeHGlobal((nint)source);
@@ -95,12 +113,6 @@ namespace EntitiesDb
             // increment and set item
             ((T*)Data)[_size++] = item;
         }
-
-        /// <summary>
-        /// Returns a span representation of the buffer.
-        /// Span should not be used after any add or remove call.
-        /// </summary>
-        public Span<T> AsSpan() => new(Data, _size);
 
         /// <summary>
         /// Clears all items in the buffer
@@ -118,6 +130,23 @@ namespace EntitiesDb
         /// Disposes unmanaged resource.
         /// </summary>
         public void Dispose() => Clear();
+
+        /// <summary>
+        /// Returns a span representation of the buffer.
+        /// Span should not be used after any add or remove call.
+        /// </summary>
+        public Span<T> GetSpan() => new(Data, _size);
+
+        /// <summary>
+        /// Reinterpret this buffer to a given type of the same size.
+        /// </summary>
+        /// <typeparam name="TDestination">Destination type</typeparam>
+        /// <returns></returns>
+        public ComponentBuffer<TDestination> Reinterpret<TDestination>() where TDestination : unmanaged
+        {
+            if (sizeof(T) != sizeof(TDestination)) throw new ReinterpretSizeException(typeof(T), typeof(TDestination));
+            return new ComponentBuffer<TDestination>(_internalCapacity, _size, _heap);
+        }
 
         /// <summary>
         /// Removes an item at a given index.

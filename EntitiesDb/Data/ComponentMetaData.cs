@@ -17,12 +17,6 @@ namespace EntitiesDb
 			InternalCapacity = internalCapacity ?? 0;
 			Bufferable = InternalCapacity > 0;
 			Stride = !Bufferable ? Size : ComponentBuffer.HeaderSize + InternalCapacity * Size;
-
-			if (type.IsConstructedGenericType &&
-				type.GetGenericTypeDefinition() == typeof(ComponentBuffer<>))
-			{
-				ComponentBufferType = type.GenericTypeArguments[0];
-			}
 		}
 
 		/// <summary>
@@ -51,10 +45,6 @@ namespace EntitiesDb
 		public bool ZeroSize => Size == 0;
 
 		public int Stride { get; }
-
-		public bool IsComponentBuffer => ComponentBufferType != null;
-
-		public Type ComponentBufferType { get; }
 
         public abstract object CreateDefault();
 
