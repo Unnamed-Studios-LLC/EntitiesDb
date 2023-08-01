@@ -197,12 +197,12 @@ namespace EntitiesDb
         if (hasEntityId)
         {
             stringBuilder.Append(Environment.NewLine);
-            stringBuilder.Append("                        entityHandle.Value,");
+            stringBuilder.Append("                        entityHandle.Value");
         }
         index = 0;
         foreach (var componentParameter in componentParameters)
         {
-            if (index != 0) stringBuilder.Append(',');
+            if (index != 0 || hasEntityId) stringBuilder.Append(',');
             stringBuilder.Append(Environment.NewLine);
             stringBuilder.Append($"                        ref componentHandle{++index}.AsRef()");
         }
