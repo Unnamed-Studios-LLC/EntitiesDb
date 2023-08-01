@@ -68,9 +68,8 @@ namespace EntitiesDb
 			SetComponent(chunk.GetComponent(listOffset, listIndex, Size), value);
 		}
 
+		public abstract void SetBuffer(Chunk chunk, int listOffset, int listIndex, object list, bool overwrite);
 		public abstract void SetComponent(void* destination, object component);
-
-		public abstract void SetComponentBuffer(Chunk chunk, int listOffset, int listIndex, object list, bool overwrite);
     }
 
 	internal unsafe sealed class ComponentMetaData<T> : ComponentMetaData where T : unmanaged
@@ -114,7 +113,13 @@ namespace EntitiesDb
             eventDispatcher.OnRemoveComponent(entityId, ref component);
         }
 
-        public override unsafe void SetComponent(void* destination, object component) => *(T*)destination = (T)component;
+        public override unsafe void SetComponent(void* destination, object component)
+		{
+			T value;
+			if (component is Boxed<T> boxed) value = boxed.Value;
+            else value = (T)component;
+            *(T*)destination = value;
+        }
 
         private static int? GetInternalCapacity(Type type)
         {
@@ -132,7 +137,7 @@ namespace EntitiesDb
             return zeroSize;
         }
 
-        public override void SetComponentBuffer(Chunk chunk, int listOffset, int listIndex, object list, bool overwrite)
+        public override void SetBuffer(Chunk chunk, int listOffset, int listIndex, object list, bool overwrite)
         {
 			var typedList = (List<T>)list;
 			ref var buffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, listIndex, Stride);

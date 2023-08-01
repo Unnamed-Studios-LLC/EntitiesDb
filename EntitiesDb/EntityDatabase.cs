@@ -1340,7 +1340,7 @@ namespace EntitiesDb
                 if (metaData.Bufferable)
                 {
                     var overwrite = sourceArchetype?.ContainsType(pair.Key) ?? false;
-                    metaData.SetComponentBuffer(chunk, listOffset, entityReference.Indices.ListIndex, pair.Value, overwrite);
+                    metaData.SetBuffer(chunk, listOffset, entityReference.Indices.ListIndex, pair.Value, overwrite);
                 }
                 else
                 {
