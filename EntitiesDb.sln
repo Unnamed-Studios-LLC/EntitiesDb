@@ -5,6 +5,10 @@ VisualStudioVersion = 25.0.1706.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntitiesDb", "EntitiesDb\EntitiesDb.csproj", "{D42A5228-50A3-4865-BF49-B08EC5D1000F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sandbox", "Sandbox\Sandbox.csproj", "{73A02286-25D9-4389-BF8A-63F8E74830A8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntitiesDb.SourceGenerators", "EntitiesDb.SourceGenerators\EntitiesDb.SourceGenerators.csproj", "{7793C109-B871-4F85-9D75-2192D9BCD55F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{D42A5228-50A3-4865-BF49-B08EC5D1000F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D42A5228-50A3-4865-BF49-B08EC5D1000F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D42A5228-50A3-4865-BF49-B08EC5D1000F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{73A02286-25D9-4389-BF8A-63F8E74830A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73A02286-25D9-4389-BF8A-63F8E74830A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73A02286-25D9-4389-BF8A-63F8E74830A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73A02286-25D9-4389-BF8A-63F8E74830A8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7793C109-B871-4F85-9D75-2192D9BCD55F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7793C109-B871-4F85-9D75-2192D9BCD55F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7793C109-B871-4F85-9D75-2192D9BCD55F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7793C109-B871-4F85-9D75-2192D9BCD55F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

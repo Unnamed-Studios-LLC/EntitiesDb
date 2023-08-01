@@ -1,12 +1,14 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace EntitiesDb
 {
-    public sealed partial class EntityDatabase
+    public sealed partial class EntityDatabase : IQueryable
     {
         /// <summary>
         /// The maximum amount of entities that can be stored in one <see cref="EntityDatabase"/>
@@ -20,7 +22,7 @@ namespace EntitiesDb
         private readonly List<Type> _componentTypes = new();
         private readonly Dictionary<Type, int> _componentTypeMap = new();
         private readonly Stack<List<EnumerationJob>> _jobListCache = new();
-        private readonly Stack<HashSet<Type>> _queryFilterCache = new();
+        private readonly Stack<QueryFilter> _queryFilterCache = new();
         private readonly EventDispatcher _eventDispatcher = new();
 
         private int[] _workingIds = new int[256];
@@ -43,6 +45,77 @@ namespace EntitiesDb
         public bool ReadOnly => _enumerators != 0 || _inEvent;
 
         /// <summary>
+        /// Adds or replaces a component buffer
+        /// </summary>
+        /// <typeparam name="T">The component type</typeparam>
+        /// <param name="entityId">Id of the entity altered</param>
+        /// <param name="components">Components to initial the buffer with</param>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="EventException"></exception>
+        /// <exception cref="InvalidBufferableException"></exception>
+        public void AddBuffer<T>(uint entityId, ReadOnlySpan<T> components) where T : unmanaged
+        {
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            // zero size check
+            var metaData = ComponentMetaData<T>.Instance;
+            if (metaData.ZeroSize)
+            {
+                throw new ZeroSizeBufferException(metaData.Type);
+            }
+
+            // bufferable check
+            if (!metaData.Bufferable)
+            {
+                throw new InvalidBufferableException(metaData.Type);
+            }
+
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            // resolve archetype
+            var added = !entityReference.Archetype.ContainsType(typeof(ComponentBuffer<T>));
+            if (added)
+            {
+                // archetype changed
+                // move entity to new archetype
+                var destinationMask = GetDestinationMaskAdd(entityReference.Archetype, typeof(T));
+                var newArchetype = GetArchetype(destinationMask);
+                entityReference = MoveEntity(entityId, entityReference, newArchetype);
+            }
+
+            // set component data
+            ref var addedBuffer = ref ComponentMetaData<ComponentBuffer<T>>.Empty;
+            if (!metaData.ZeroSize)
+            {
+                // only set if non-zero
+                var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
+                var listOffset = entityReference.Archetype.GetListOffset(typeof(T));
+                addedBuffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, entityReference.Indices.ListIndex, metaData.Stride);
+
+                if (!added)
+                {
+                    // we are overwriting the previous buffer, dispose it first
+                    addedBuffer.Dispose();
+                }
+
+                addedBuffer = new ComponentBuffer<T>(metaData.InternalCapacity, components);
+            }
+
+            // add event
+            if (added)
+            {
+                PublishAddEvent(entityId, ref addedBuffer);
+            }
+        }
+
+        /// <summary>
         /// Adds or replaces a component
         /// </summary>
         /// <typeparam name="T">The component type</typeparam>
@@ -51,6 +124,7 @@ namespace EntitiesDb
         /// <exception cref="ReadOnlyException"></exception>
         /// <exception cref="EntityNotFoundException"></exception>
         /// <exception cref="EventException"></exception>
+        /// <exception cref="BufferableException"></exception>
         public void AddComponent<T>(uint entityId, T component = default) where T : unmanaged
         {
             if (ReadOnly)
@@ -58,13 +132,17 @@ namespace EntitiesDb
                 throw new ReadOnlyException();
             }
 
+            // retrieve metadata first to ensure static contructors are run for this type
+            var metaData = ComponentMetaData<T>.Instance;
+            if (metaData.Bufferable)
+            {
+                throw new BufferableException(typeof(T));
+            }
+
             if (!_entityReferences.TryGetValue(entityId, out var entityReference))
             {
                 throw new EntityNotFoundException(entityId);
             }
-
-            // retrieve metadata first to ensure static contructors are run for this type
-            var metaData = ComponentMetaData<T>.Instance;
 
             // resolve archetype
             var added = !entityReference.Archetype.ContainsType(typeof(T));
@@ -79,12 +157,12 @@ namespace EntitiesDb
 
             // set component data
             ref var addedComponent = ref ComponentMetaData<T>.Empty;
-            if (metaData.Size != 0)
+            if (!metaData.ZeroSize)
             {
                 // only set if non-zero
                 var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
                 var listOffset = entityReference.Archetype.GetListOffset(typeof(T));
-                addedComponent = ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex);
+                addedComponent = ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex, metaData.Stride);
                 addedComponent = component;
             }
 
@@ -137,7 +215,7 @@ namespace EntitiesDb
             }
 
             // set component data
-            SetComponentData(newEntityReference, entityLayout);
+            SetComponentData(newEntityReference, entityLayout, entityReference.Archetype);
 
             // add events
             if (archetypeChanged)
@@ -281,7 +359,7 @@ namespace EntitiesDb
             var entityReference = CreateEntityInternal(entityId, destinationMasks);
 
             // set component data
-            SetComponentData(entityReference, entityLayout);
+            SetComponentData(entityReference, entityLayout, null);
 
             // add entity event
             PublishAddEntity(entityId);
@@ -351,7 +429,7 @@ namespace EntitiesDb
             var entityReference = CreateEntityInternal(entityId, destinationMasks);
 
             // set component data
-            SetComponentData(entityReference, entityLayout);
+            SetComponentData(entityReference, entityLayout, null);
 
             // add entity event
             PublishAddEntity(entityId);
@@ -430,11 +508,18 @@ namespace EntitiesDb
         /// <returns>Reference to the component for the given entity</returns>
         /// <exception cref="EntityNotFoundException"></exception>
         /// <exception cref="ComponentNotFoundException"></exception>
+        /// <exception cref="BufferableException"></exception>
         public ref T GetComponent<T>(uint entityId) where T : unmanaged
         {
             if (!_entityReferences.TryGetValue(entityId, out var entityReference))
             {
                 throw new EntityNotFoundException(entityId);
+            }
+
+            var metaData = ComponentMetaData<T>.Instance;
+            if (metaData.Bufferable)
+            {
+                throw new BufferableException(metaData.Type);
             }
 
             if (!entityReference.Archetype.TryGetListOffset(typeof(T), out var listOffset))
@@ -443,7 +528,39 @@ namespace EntitiesDb
             }
 
             var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
-            return ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex);
+            return ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex, metaData.Stride);
+        }
+
+        /// <summary>
+        /// Returns a reference to a component buffer for an entity.
+        /// Ref values may be invalid after structural changes and should not be stored.
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="entityId">Id of the entity</param>
+        /// <returns>Reference to the component buffer for the given entity</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="ComponentNotFoundException"></exception>
+        /// <exception cref="InvalidBufferableException"></exception>
+        public ref T GetComponentBuffer<T>(uint entityId) where T : unmanaged
+        {
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            var metaData = ComponentMetaData<T>.Instance;
+            if (!metaData.Bufferable)
+            {
+                throw new InvalidBufferableException(metaData.Type);
+            }
+
+            if (!entityReference.Archetype.TryGetListOffset(typeof(T), out var listOffset))
+            {
+                throw new ComponentNotFoundException(entityId, typeof(T));
+            }
+
+            var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
+            return ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex, metaData.Stride);
         }
 
         /// <summary>
@@ -493,6 +610,30 @@ namespace EntitiesDb
             return entityReference.Archetype.Types;
         }
 
+        public QueryFilter GetQueryFilter()
+        {
+            var queryFilter = RentQueryFilter();
+            return queryFilter;
+        }
+
+        /// <summary>
+        /// Returns if an entity has a given component buffer type
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="entityId">Id of the entity</param>
+        /// <returns>If the entity has the given component type</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        public bool HasBuffer<T>(uint entityId) where T : unmanaged => HasBuffer(entityId, typeof(T));
+
+        /// <summary>
+        /// Returns if an entity has a given component buffer type
+        /// </summary>
+        /// <param name="entityId">Id of the entity</param>
+        /// <param name="componentType">The type to check</param>
+        /// <returns>If the entity has the given component type</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        public bool HasBuffer(uint entityId, Type componentType) => HasComponent(entityId, componentType);
+
         /// <summary>
         /// Returns if an entity has a given component type
         /// </summary>
@@ -500,15 +641,7 @@ namespace EntitiesDb
         /// <param name="entityId">Id of the entity</param>
         /// <returns>If the entity has the given component type</returns>
         /// <exception cref="EntityNotFoundException"></exception>
-        public bool HasComponent<T>(uint entityId) where T : unmanaged
-        {
-            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
-            {
-                throw new EntityNotFoundException(entityId);
-            }
-
-            return entityReference.Archetype.ContainsType(typeof(T));
-        }
+        public bool HasComponent<T>(uint entityId) where T : unmanaged => HasComponent(entityId, typeof(T));
 
         /// <summary>
         /// Returns if an entity has a given component type
@@ -541,6 +674,54 @@ namespace EntitiesDb
         public void RegisterType<T>() where T : unmanaged => GetTypeId(typeof(T));
 
         /// <summary>
+        /// Registers a component type, can be used to ensure deterministic component ordering
+        /// </summary>
+        /// <param name="componentType">Component type</param>
+        public void RegisterType(Type componentType) => GetTypeId(componentType);
+
+        /// <summary>
+        /// Removes a component buffer for a given entity if the entity contains the component
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="entityId">Id of the entity</param>
+        /// <returns>If the component was found and removed</returns>
+        /// <exception cref="ReadOnlyException"></exception>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="InvalidBufferableException"></exception>
+        public bool RemoveBuffer<T>(uint entityId) where T : unmanaged
+        {
+            if (ReadOnly)
+            {
+                throw new ReadOnlyException();
+            }
+
+            var metaData = ComponentMetaData<T>.Instance;
+            if (!metaData.Bufferable) throw new InvalidBufferableException(metaData.Type);
+
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            if (!entityReference.Archetype.TryGetListOffset(typeof(T), out var listOffset))
+            {
+                return false;
+            }
+
+            // remove event
+            var chunk = entityReference.GetChunk();
+            ref var removedBuffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, entityReference.Indices.ListIndex, metaData.Stride);
+            PublishRemoveEvent(entityId, ref removedBuffer);
+            removedBuffer.Dispose();
+
+            // move entity to new archetype
+            var destinationMask = GetDestinationMaskRemove(entityReference.Archetype, typeof(T));
+            var newArchetype = GetArchetype(destinationMask);
+            MoveEntity(entityId, entityReference, newArchetype);
+            return true;
+        }
+
+        /// <summary>
         /// Removes a component for a given entity if the entity contains the component
         /// </summary>
         /// <typeparam name="T">Component type</typeparam>
@@ -548,12 +729,16 @@ namespace EntitiesDb
         /// <returns>If the component was found and removed</returns>
         /// <exception cref="ReadOnlyException"></exception>
         /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="BufferableException"></exception>
         public bool RemoveComponent<T>(uint entityId) where T : unmanaged
         {
             if (ReadOnly)
             {
                 throw new ReadOnlyException();
             }
+
+            var metaData = ComponentMetaData<T>.Instance;
+            if (metaData.Bufferable) throw new BufferableException(metaData.Type);
 
             if (!_entityReferences.TryGetValue(entityId, out var entityReference))
             {
@@ -567,10 +752,7 @@ namespace EntitiesDb
 
             // remove event
             ref var removedComponent = ref ComponentMetaData<T>.Empty;
-            if (listOffset >= 0)
-            {
-                removedComponent = ref entityReference.GetChunk().GetComponent<T>(listOffset, entityReference.Indices.ListIndex);
-            }
+            if (listOffset >= 0) removedComponent = ref entityReference.GetChunk().GetComponent<T>(listOffset, entityReference.Indices.ListIndex, metaData.Stride);
             PublishRemoveEvent(entityId, ref removedComponent);
 
             // move entity to new archetype
@@ -626,11 +808,18 @@ namespace EntitiesDb
         /// <param name="found">If the component was found</param>
         /// <returns>Reference to the component</returns>
         /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="BufferableException"></exception>
         public ref T TryGetComponent<T>(uint entityId, out bool found) where T : unmanaged
         {
             if (!_entityReferences.TryGetValue(entityId, out var entityReference))
             {
                 throw new EntityNotFoundException(entityId);
+            }
+
+            var metaData = ComponentMetaData<T>.Instance;
+            if (metaData.Bufferable)
+            {
+                throw new BufferableException(metaData.Type);
             }
 
             if (!entityReference.Archetype.TryGetListOffset(typeof(T), out var listOffset))
@@ -641,22 +830,49 @@ namespace EntitiesDb
 
             found = true;
             var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
-            return ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex);
+            return ref chunk.GetComponent<T>(listOffset, entityReference.Indices.ListIndex, metaData.Stride);
         }
 
-        internal void Query<TQuery>(TQuery query, bool parallel, in QueryFilter filter) where TQuery : IQuery
+        /// <summary>
+        /// Trys to get a component buffer for a given entity.
+        /// If the componentbuffer is not found, the returned ref is invalid and should not be used.
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="entityId">Id of the entity</param>
+        /// <param name="found">If the component was found</param>
+        /// <returns>Reference to the component</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        /// <exception cref="InvalidBufferableException"></exception>
+        public ref ComponentBuffer<T> TryGetComponentBuffer<T>(uint entityId, out bool found) where T : unmanaged
+        {
+            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
+            {
+                throw new EntityNotFoundException(entityId);
+            }
+
+            var metaData = ComponentMetaData<T>.Instance;
+            if (!metaData.Bufferable)
+            {
+                throw new InvalidBufferableException(metaData.Type);
+            }
+
+            if (!entityReference.Archetype.TryGetListOffset(typeof(T), out var listOffset))
+            {
+                found = false;
+                return ref ComponentMetaData<T>.EmptyBuffer;
+            }
+
+            found = true;
+            var chunk = entityReference.GetChunk();
+            return ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, entityReference.Indices.ListIndex, metaData.Stride);
+        }
+
+        internal void Query<TEnumerator>(TEnumerator enumerator, in QueryFilter filter) where TEnumerator : IQueryEnumerator
         {
             Interlocked.Increment(ref _enumerators);
-            parallel = parallel && Interlocked.CompareExchange(ref _inParallel, 1, 0) == 0;
+            var parallel = filter.Parallel && Interlocked.CompareExchange(ref _inParallel, 1, 0) == 0;
             try
             {
-                foreach (var metaData in query.GetDelegateMetaData())
-                {
-                    // add required ids to with filter
-                    if (metaData.Size == 0) throw new ForEachTagException(metaData.Type);
-                    filter.WithTypes.Add(metaData.Type);
-                }
-
                 // determine jobs
                 Span<ulong> with = stackalloc ulong[_workingMasks.Length];
                 Span<ulong> no = stackalloc ulong[_workingMasks.Length];
@@ -683,7 +899,7 @@ namespace EntitiesDb
                     if (!Mask.Match(archetype.Mask, with, no, any)) continue;
                     for (int i = 0; i < archetype.ChunkCount; i++)
                     {
-                        jobList.Add(new(archetype, i));
+                        jobList.Add(new(archetype, archetype.GetChunk(i), archetype.GetChunkLength(i)));
                     }
                 }
 
@@ -692,14 +908,14 @@ namespace EntitiesDb
                 {
                     foreach (var job in jobList)
                     {
-                        query.EnumerateChunk(in job);
+                        enumerator.EnumerateChunk(in job);
                     }
                 }
                 else
                 {
                     Parallel.ForEach(jobList, job =>
                     {
-                        query.EnumerateChunk(in job);
+                        enumerator.EnumerateChunk(in job);
                     });
                 }
 
@@ -720,7 +936,7 @@ namespace EntitiesDb
 
             foreach (var metaData in source.Archetype.MetaData)
             {
-                if (metaData.Size == 0 || // ignore zero-size
+                if (metaData.ZeroSize || // ignore zero-size
                     !source.Archetype.TryGetListOffset(metaData.Type, out var sourceOffset) ||
                     !destination.Archetype.TryGetListOffset(metaData.Type, out var destinationOffset))
                 {
@@ -804,7 +1020,7 @@ namespace EntitiesDb
         private Span<ulong> GetDestinationMask(EntityLayout entityLayout)
         {
             Array.Clear(_workingMasks, 0, _workingMasks.Length);
-            foreach (var pair in entityLayout.AddedComponents)
+            foreach (var pair in entityLayout.Added)
             {
                 var typeId = GetTypeId(pair.Key);
                 Mask.IdAdd(_workingMasks, typeId, _workingMasks);
@@ -817,13 +1033,13 @@ namespace EntitiesDb
             Array.Clear(_workingMasks, 0, _workingMasks.Length);
             currentArchetype.Mask.CopyTo(_workingMasks.AsSpan());
 
-            foreach (var pair in entityLayout.AddedComponents)
+            foreach (var pair in entityLayout.Added)
             {
                 var typeId = GetTypeId(pair.Key);
                 Mask.IdAdd(_workingMasks, typeId, _workingMasks);
             }
 
-            foreach (var type in entityLayout.RemovedComponents)
+            foreach (var type in entityLayout.Removed)
             {
                 var typeId = GetTypeId(type);
                 Mask.IdRemove(_workingMasks, typeId, _workingMasks);
@@ -1025,12 +1241,7 @@ namespace EntitiesDb
         {
             lock (_queryFilterCache)
             {
-                return new QueryFilter(
-                    this,
-                    _queryFilterCache.Count == 0 ? new() : _queryFilterCache.Pop(),
-                    _queryFilterCache.Count == 0 ? new() : _queryFilterCache.Pop(),
-                    _queryFilterCache.Count == 0 ? new() : _queryFilterCache.Pop()
-                );
+                return _queryFilterCache.Count == 0 ? new(this) : _queryFilterCache.Pop();
             }
         }
 
@@ -1047,24 +1258,28 @@ namespace EntitiesDb
         {
             lock (_queryFilterCache)
             {
-                queryFilter.AnyTypes.Clear();
-                queryFilter.NoTypes.Clear();
-                queryFilter.WithTypes.Clear();
-                _queryFilterCache.Push(queryFilter.AnyTypes);
-                _queryFilterCache.Push(queryFilter.NoTypes);
-                _queryFilterCache.Push(queryFilter.WithTypes);
+                queryFilter.Clear();
+                _queryFilterCache.Push(queryFilter);
             }
         }
 
-        private void SetComponentData(EntityReference entityReference, EntityLayout entityLayout)
+        private void SetComponentData(EntityReference entityReference, EntityLayout entityLayout, Archetype sourceArchetype)
         {
-            foreach (var pair in entityLayout.AddedComponents)
+            foreach (var pair in entityLayout.Added)
             {
                 var metaData = ComponentMetaData.All[pair.Key];
-                if (metaData.Size == 0) continue; // only set non-zero components
-                var chunk = entityReference.Archetype.GetChunk(entityReference.Indices.ChunkIndex);
+                if (metaData.ZeroSize) continue; // only set non-zero components
+                var chunk = entityReference.GetChunk();
                 var listOffset = entityReference.Archetype.GetListOffset(pair.Key);
-                metaData.SetComponent(chunk, listOffset, entityReference.Indices.ListIndex, pair.Value);
+                if (metaData.Bufferable)
+                {
+                    var overwrite = sourceArchetype?.ContainsType(pair.Key) ?? false;
+                    metaData.SetComponentBuffer(chunk, listOffset, entityReference.Indices.ListIndex, pair.Value, overwrite);
+                }
+                else
+                {
+                    metaData.SetComponent(chunk, listOffset, entityReference.Indices.ListIndex, pair.Value);
+                }
             }
         }
     }
