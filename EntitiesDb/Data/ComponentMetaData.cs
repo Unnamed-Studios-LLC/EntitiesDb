@@ -48,24 +48,18 @@ namespace EntitiesDb
 
         public abstract object CreateDefault();
 
-        public object GetComponent(Chunk chunk, int listOffset, int listIndex)
-		{
-			if (ZeroSize) return CreateDefault();
-			return GetComponent(chunk.GetComponent(listOffset, listIndex, Size));
-		}
+        public abstract void DisposeBuffer(EntityReference entityReference);
 
-        public abstract object GetComponent(void* source);
-
-		public abstract bool IsInstanceOfType(object value);
+        public abstract bool IsInstanceOfType(object value);
 
 		public abstract void OnAddComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex);
 
 		public abstract void OnRemoveComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex);
 
-		public void SetComponent(Chunk chunk, int listOffset, int listIndex, object value)
+		public void SetComponent(Chunk chunk, int listOffset, int listIndex, object boxed)
 		{
-			if (ZeroSize) return;
-			SetComponent(chunk.GetComponent(listOffset, listIndex, Size), value);
+			if (ZeroSize || boxed == null) return;
+			SetComponent(chunk.GetComponent(listOffset, listIndex, Size), boxed);
 		}
 
 		public abstract void SetBuffer(Chunk chunk, int listOffset, int listIndex, object list, bool overwrite);
@@ -95,7 +89,13 @@ namespace EntitiesDb
 
 		public override object CreateDefault() => default(T);
 
-        public override unsafe object GetComponent(void* source) => *(T*)source;
+        public override void DisposeBuffer(EntityReference entityReference)
+        {
+            var chunk = entityReference.GetChunk();
+            var (listOffset, stride) = entityReference.Archetype.GetListOffsetAndStride(Type);
+            ref var buffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, entityReference.Indices.ListIndex, stride);
+            buffer.Dispose();
+        }
 
         public override bool IsInstanceOfType(object value) => value is T;
 

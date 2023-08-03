@@ -279,6 +279,15 @@ namespace EntitiesDb
                 // remove events
                 PublishRemoveEvents(entityId, entityReference, newArchetype);
 
+                // dispose removed buffers
+                foreach (var removedType in entityLayout.Removed)
+                {
+                    if (!entityReference.Archetype.ContainsType(removedType)) continue;
+                    var metaData = ComponentMetaData.All[removedType];
+                    if (!metaData.Bufferable) continue;
+                    metaData.DisposeBuffer(entityReference);
+                }
+
                 // move entity to new archetype
                 newEntityReference = MoveEntity(entityId, entityReference, newArchetype);
             }
