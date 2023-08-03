@@ -27,10 +27,10 @@ public readonly unsafe struct EnumerationJob
         return new ComponentHandle<T>(pointer, stride);
     }
 
-    public ComponentHandle<ComponentBuffer<T>> GetComponentBufferHandle<T>() where T : unmanaged
+    public ComponentBufferHandle<T> GetComponentBufferHandle<T>() where T : unmanaged
     {
         var (offset, stride) = Archetype.GetListOffsetAndStride(typeof(T));
         var pointer = Chunk.GetList(offset);
-        return new ComponentHandle<ComponentBuffer<T>>(pointer, stride);
+        return new ComponentBufferHandle<T>(pointer, stride);
     }
 }

@@ -16,7 +16,7 @@ namespace EntitiesDb
 			Size = size;
 			InternalCapacity = internalCapacity ?? 0;
 			Bufferable = InternalCapacity > 0;
-			Stride = !Bufferable ? Size : ComponentBuffer.HeaderSize + InternalCapacity * Size;
+			Stride = !Bufferable ? Size : ComponentBufferHeader.DataOffset + Math.Max(InternalCapacity * Size, sizeof(void*));
 		}
 
 		/// <summary>
@@ -45,12 +45,6 @@ namespace EntitiesDb
 		public bool ZeroSize => Size == 0;
 
 		public int Stride { get; }
-
-        public abstract object CreateDefault();
-
-        public abstract void DisposeBuffer(EntityReference entityReference);
-
-        public abstract bool IsInstanceOfType(object value);
 
 		public abstract void OnAddComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex);
 
@@ -87,23 +81,11 @@ namespace EntitiesDb
         /// </summary>
         public static void Register() { }
 
-		public override object CreateDefault() => default(T);
-
-        public override void DisposeBuffer(EntityReference entityReference)
-        {
-            var chunk = entityReference.GetChunk();
-            var (listOffset, stride) = entityReference.Archetype.GetListOffsetAndStride(Type);
-            ref var buffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, entityReference.Indices.ListIndex, stride);
-            buffer.Dispose();
-        }
-
-        public override bool IsInstanceOfType(object value) => value is T;
-
         public override void OnAddComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex)
         {
 			if (Bufferable)
             {
-                ref var buffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, listIndex, Stride);
+                var buffer = chunk.GetBuffer<T>(listOffset, listIndex, Stride);
                 eventDispatcher.OnAddComponent(entityId, ref buffer);
             }
 			else
@@ -118,7 +100,7 @@ namespace EntitiesDb
         {
             if (Bufferable)
             {
-                ref var buffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, listIndex, Stride);
+                var buffer = chunk.GetBuffer<T>(listOffset, listIndex, Stride);
                 eventDispatcher.OnAddComponent(entityId, ref buffer);
             }
             else
@@ -156,9 +138,9 @@ namespace EntitiesDb
         public override void SetBuffer(Chunk chunk, int listOffset, int listIndex, object list, bool overwrite)
         {
 			var typedList = (List<T>)list;
-			ref var buffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, listIndex, Stride);
+			var buffer = chunk.GetBuffer<T>(listOffset, listIndex, Stride);
 			if (overwrite) buffer.Dispose();
-			buffer = new ComponentBuffer<T>(InternalCapacity, ReadOnlySpan<T>.Empty);
+			buffer = new ComponentBuffer<T>(buffer, InternalCapacity, ReadOnlySpan<T>.Empty);
 			foreach (var value in typedList)
 			{
 				buffer.Add(value);

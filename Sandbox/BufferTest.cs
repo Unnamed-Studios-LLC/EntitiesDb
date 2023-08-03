@@ -51,7 +51,7 @@ public class BufferTest
     {
         _entities?.GetQueryFilter().ForEach(_entities!, static (uint entityId, ref Component component, ref ComponentBuffer<BufferedComponent> bufferedComponents, ref EntityDatabase entities) =>
         {
-            var bufferSpan = bufferedComponents.GetSpan();
+            var bufferSpan = bufferedComponents.Span;
             foreach (ref var bufferComponent in bufferSpan)
             {
 
@@ -59,7 +59,7 @@ public class BufferTest
 
             entities.GetQueryFilter().ForEach(static (uint entityId, ref Component component, ref ComponentBuffer<BufferedComponent> bufferedComponents) =>
             {
-                var bufferSpan = bufferedComponents.GetSpan();
+                var bufferSpan = bufferedComponents.Span;
                 foreach (ref var bufferComponent in bufferSpan)
                 {
 

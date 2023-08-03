@@ -209,9 +209,13 @@ internal static class {uniqueName}Extension
         index = 0;
         foreach (var componentParameter in componentParameters)
         {
+            var parameterType = componentParameter.Type as INamedTypeSymbol ?? throw new Exception();
+            var isBuffer = IsComponentBufferType(parameterType);
+
             if (index != 0 || hasEntityId) stringBuilder.Append(',');
             stringBuilder.Append(Environment.NewLine);
-            stringBuilder.Append($"                    ref componentHandle{++index}.AsRef()");
+            if (isBuffer) stringBuilder.Append($"                    ref componentHandle{++index}.Buffer");
+            else stringBuilder.Append($"                    ref componentHandle{++index}.AsRef()");
         }
         if (hasState)
         {

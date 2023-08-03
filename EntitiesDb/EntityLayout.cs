@@ -64,7 +64,7 @@ namespace EntitiesDb
             var metaData = ComponentMetaData<T>.Instance;
             if (metaData.ZeroSize) throw new ZeroSizeBufferException(typeof(T));
             if (!metaData.Bufferable) throw new InvalidBufferableException(typeof(T));
-            var bufferType = typeof(ComponentBuffer<T>);
+            var bufferType = typeof(T);
             _added.Remove(bufferType);
             _removed.Add(bufferType);
         }

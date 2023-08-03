@@ -2,188 +2,186 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace EntitiesDb
+namespace EntitiesDb;
+
+public unsafe readonly struct ComponentBuffer<T> : IDisposable where T : unmanaged
 {
-    public static class ComponentBuffer
+    private readonly ComponentBufferHeader* _header;
+
+    internal ComponentBuffer(ref ComponentBufferHeader headerRef)
     {
-        public const int HeaderSize = 8;
+        _header = (ComponentBufferHeader*)Unsafe.AsPointer(ref headerRef);
     }
 
-    public unsafe struct ComponentBuffer<T> : IDisposable where T : unmanaged
+    internal ComponentBuffer(ComponentBufferHeader* header)
     {
-        private readonly int _internalCapacity;
-        private int _size;
-        private void* _heap;
+        _header = header;
+    }
 
-        internal ComponentBuffer(int internalCapacity, int size, void* heap)
+    internal ComponentBuffer(void* header)
+    {
+        _header = (ComponentBufferHeader*)header;
+    }
+
+    internal ComponentBuffer(ComponentBuffer<T> previous, int internalCapacity, ReadOnlySpan<T> data)
+    {
+        _header = previous._header;
+        _header->InternalCapacity = internalCapacity;
+        _header->Size = data.Length;
+
+        if (data.Length == 0) return;
+
+        var capacity = Capacity;
+        if (capacity > _header->InternalCapacity) _header->Heap = Marshal.AllocHGlobal(capacity * sizeof(T)).ToPointer();
+        data.CopyTo(Span);
+    }
+
+    public ref T this[int index]
+    {
+        get
         {
-            _internalCapacity = internalCapacity;
-            _size = size;
-            _heap = heap;
+            if (index < 0 || index >= _header->Size) throw new ArgumentOutOfRangeException(nameof(index));
+            return ref Unsafe.AsRef<T>((T*)Data + index);
         }
+    }
 
-        internal ComponentBuffer(int internalCapacity, ReadOnlySpan<T> data)
+    /// <summary>
+    /// The amount of items in the buffer
+    /// </summary>
+    public int Length => _header->Size;
+
+    /// <summary>
+    /// Returns a span representation of the buffer.
+    /// Span should not be used after any add or remove call.
+    /// </summary>
+    public Span<T> Span => new(Data, _header->Size);
+
+    private int Capacity
+    {
+        get
         {
-            _internalCapacity = internalCapacity;
-            _size = data.Length;
-
-            if (data.Length == 0) return;
-
-            var capacity = Capacity;
-            if (capacity > _internalCapacity) _heap = Marshal.AllocHGlobal(capacity * sizeof(T)).ToPointer();
-            else _heap = default;
-            data.CopyTo(GetSpan());
-        }
-
-        public ref T this[int index]
-        {
-            get
+            var capacity = _header->InternalCapacity;
+            while (capacity < _header->Size)
             {
-                if (index < 0 || index >= _size) throw new ArgumentOutOfRangeException(nameof(index));
-                return ref Unsafe.AsRef<T>((T*)Data + index);
+                capacity *= 2;
             }
+            return capacity;
         }
+    }
 
-        /// <summary>
-        /// The amount of items in the buffer
-        /// </summary>
-        public int Length => _size;
-
-        private int Capacity
+    private void* Data
+    {
+        get
         {
-            get
-            {
-                var capacity = _internalCapacity;
-                while (capacity < _size)
-                {
-                    capacity *= 2;
-                }
-                return capacity;
-            }
+            if (_header->Size > _header->InternalCapacity) return _header->Heap;
+            return (byte*)_header + ComponentBufferHeader.DataOffset;
         }
+    }
 
-        private void* Data
+    /// <summary>
+    /// <inheritdoc cref="Add(ref T)"/>
+    /// </summary>
+    /// <param name="item">Item to add</param>
+    public void Add(T item) => Add(ref item);
+
+    /// <summary>
+    /// Adds an item to the buffer
+    /// </summary>
+    /// <param name="item">Item to add</param>
+    public void Add(ref T item)
+    {
+        // only check for resize on significant size values
+        if (_header->Size >= _header->InternalCapacity &&
+            (_header->Size % _header->InternalCapacity) == 0)
         {
-            get
-            {
-                if (_size > _internalCapacity) return _heap;
-                fixed (void** ptr = &_heap)
-                {
-                    return ptr;
-                }
-            }
-        }
-
-        /// <summary>
-        /// <inheritdoc cref="Add(ref T)"/>
-        /// </summary>
-        /// <param name="item">Item to add</param>
-        public void Add(T item) => Add(ref item);
-
-        /// <summary>
-        /// Adds an item to the buffer
-        /// </summary>
-        /// <param name="item">Item to add</param>
-        public void Add(ref T item)
-        {
-            // only check for resize on significant size values
-            if (_size >= _internalCapacity &&
-                (_size % _internalCapacity) == 0)
-            {
-                // possible capacity change
-                var capacity = Capacity;
-                if (_size == capacity)
-                {
-                    // determine destination, new heap
-                    var newHeapSize = capacity * 2 * sizeof(T);
-                    var source = _size == _internalCapacity ? Data : _heap;
-                    var destination = Marshal.AllocHGlobal(newHeapSize).ToPointer();
-
-                    // copy items
-                    Buffer.MemoryCopy(source, destination, newHeapSize, capacity * sizeof(T));
-
-                    // free old heap
-                    if (_size != _internalCapacity) Marshal.FreeHGlobal((nint)source);
-
-                    // assign new heap
-                    _heap = destination;
-                }
-            }
-
-            // increment and set item
-            _size++;
-            ((T*)Data)[_size - 1] = item;
-        }
-
-        /// <summary>
-        /// Clears all items in the buffer
-        /// </summary>
-        public void Clear()
-        {
-            if (_size > _internalCapacity)
-            {
-                Marshal.FreeHGlobal((nint)_heap);
-            }
-            _size = 0;
-        }
-
-        /// <summary>
-        /// Disposes unmanaged resource.
-        /// </summary>
-        public void Dispose() => Clear();
-
-        /// <summary>
-        /// Returns a span representation of the buffer.
-        /// Span should not be used after any add or remove call.
-        /// </summary>
-        public Span<T> GetSpan() => new(Data, _size);
-
-        /// <summary>
-        /// Reinterpret this buffer to a given type of the same size.
-        /// </summary>
-        /// <typeparam name="TDestination">Destination type</typeparam>
-        /// <returns></returns>
-        public ComponentBuffer<TDestination> Reinterpret<TDestination>() where TDestination : unmanaged
-        {
-            if (sizeof(T) != sizeof(TDestination)) throw new ReinterpretSizeException(typeof(T), typeof(TDestination));
-            return new ComponentBuffer<TDestination>(_internalCapacity, _size, _heap);
-        }
-
-        /// <summary>
-        /// Removes an item at a given index.
-        /// </summary>
-        /// <param name="index">The index of the item to remove.</param>
-        /// <exception cref="ArgumentOutOfRangeException"></exception>
-        public void RemoveAtSwapBack(int index)
-        {
-            if (index < 0 || index >= _size) throw new ArgumentOutOfRangeException(nameof(index));
-
-            // decrement and swap back
-            var nextSize = _size - 1;
-            if (index != nextSize) ((T*)Data)[index] = ((T*)Data)[nextSize];
-            _size = nextSize;
-
-            // only check for resize on significant size values
-            if (_size < _internalCapacity ||
-                (_size % _internalCapacity) != 0) return;
-
             // possible capacity change
             var capacity = Capacity;
-            if (_size != capacity) return;
+            if (_header->Size == capacity)
+            {
+                // determine destination, new heap
+                var newHeapSize = capacity * 2 * sizeof(T);
+                var source = _header->Size == _header->InternalCapacity ? Data : _header->Heap;
+                var destination = Marshal.AllocHGlobal(newHeapSize).ToPointer();
 
-            // determine destination (new heap or internal)
-            var newHeapSize = capacity * sizeof(T);
-            var source = _heap;
-            var destination = _size == _internalCapacity ? Data : Marshal.AllocHGlobal(newHeapSize).ToPointer();
+                // copy items
+                Buffer.MemoryCopy(source, destination, newHeapSize, capacity * sizeof(T));
 
-            // copy items
-            Buffer.MemoryCopy(source, destination, newHeapSize, newHeapSize);
+                // free old heap
+                if (_header->Size != _header->InternalCapacity) Marshal.FreeHGlobal((nint)source);
 
-            // free old heap
-            Marshal.FreeHGlobal((nint)source);
-
-            // assign new heap, if not internal
-            if (_size != _internalCapacity) _heap = destination;
+                // assign new heap
+                _header->Heap = destination;
+            }
         }
+
+        // increment and set item
+        _header->Size++;
+        ((T*)Data)[_header->Size - 1] = item;
+    }
+
+    /// <summary>
+    /// Clears all items in the buffer
+    /// </summary>
+    public void Clear()
+    {
+        if (_header->Size > _header->InternalCapacity)
+        {
+            Marshal.FreeHGlobal((nint)_header->Heap);
+        }
+        _header->Size = 0;
+    }
+
+    /// <summary>
+    /// Disposes unmanaged resource.
+    /// </summary>
+    public void Dispose() => Clear();
+
+    /// <summary>
+    /// Gets an item from the buffer
+    /// </summary>
+    /// <param name="index"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
+    public ref T Get(int index)
+    {
+        if (index < 0 || index >= _header->Size) throw new ArgumentOutOfRangeException(nameof(index));
+        return ref Unsafe.AsRef<T>((T*)Data + index);
+    }
+
+    /// <summary>
+    /// Removes an item at a given index.
+    /// </summary>
+    /// <param name="index">The index of the item to remove.</param>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
+    public void RemoveAtSwapBack(int index)
+    {
+        if (index < 0 || index >= _header->Size) throw new ArgumentOutOfRangeException(nameof(index));
+
+        // decrement and swap back
+        var nextSize = _header->Size - 1;
+        if (index != nextSize) ((T*)Data)[index] = ((T*)Data)[nextSize];
+        _header->Size = nextSize;
+
+        // only check for resize on significant size values
+        if (_header->Size < _header->InternalCapacity ||
+            (_header->Size % _header->InternalCapacity) != 0) return;
+
+        // possible capacity change
+        var capacity = Capacity;
+        if (_header->Size != capacity) return;
+
+        // determine destination (new heap or internal)
+        var newHeapSize = capacity * sizeof(T);
+        var source = _header->Heap;
+        var destination = _header->Size == _header->InternalCapacity ? Data : Marshal.AllocHGlobal(newHeapSize).ToPointer();
+
+        // copy items
+        Buffer.MemoryCopy(source, destination, newHeapSize, newHeapSize);
+
+        // free old heap
+        Marshal.FreeHGlobal((nint)source);
+
+        // assign new heap, if not internal
+        if (_header->Size != _header->InternalCapacity) _header->Heap = destination;
     }
 }

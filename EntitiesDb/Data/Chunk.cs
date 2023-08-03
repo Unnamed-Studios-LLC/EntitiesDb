@@ -27,6 +27,12 @@ namespace EntitiesDb
 			);
         }
 
+        public ComponentBuffer<T> GetBuffer<T>(int listOffset, int listIndex, int stride) where T : unmanaged
+        {
+            var internalBuffer = GetComponent(listOffset, listIndex, stride);
+            return new ComponentBuffer<T>(internalBuffer);
+        }
+
         public byte* GetComponent(int listOffset, int listIndex, int stride)
         {
 			return (byte*)Data + listOffset + listIndex * stride;
