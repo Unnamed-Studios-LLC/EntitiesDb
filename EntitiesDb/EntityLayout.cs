@@ -110,12 +110,12 @@ namespace EntitiesDb
             Boxed<T> boxed;
             if (!_added.TryGetValue(componentType, out var boxedObject))
             {
-                boxed = (Boxed<T>)boxedObject;
+                boxed = new Boxed<T>();
+                _added.Add(typeof(T), boxed);
             }
             else
             {
-                boxed = new Boxed<T>();
-                _added.Add(typeof(T), boxed);
+                boxed = (Boxed<T>)boxedObject;
             }
             boxed.Value = component;
         }

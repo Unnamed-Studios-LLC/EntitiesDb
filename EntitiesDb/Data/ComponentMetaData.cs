@@ -101,16 +101,32 @@ namespace EntitiesDb
 
         public override void OnAddComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex)
         {
-			ref var component = ref Empty;
-			if (!ZeroSize) component = ref chunk.GetComponent<T>(listOffset, listIndex, Stride);
-            eventDispatcher.OnAddComponent(entityId, ref component);
+			if (Bufferable)
+            {
+                ref var buffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, listIndex, Stride);
+                eventDispatcher.OnAddComponent(entityId, ref buffer);
+            }
+			else
+            {
+                ref var component = ref Empty;
+                if (!ZeroSize) component = ref chunk.GetComponent<T>(listOffset, listIndex, Stride);
+                eventDispatcher.OnAddComponent(entityId, ref component);
+            }
         }
 
         public override void OnRemoveComponent(EventDispatcher eventDispatcher, uint entityId, Chunk chunk, int listOffset, int listIndex)
         {
-            ref var component = ref Empty;
-            if (!ZeroSize) component = ref chunk.GetComponent<T>(listOffset, listIndex, Stride);
-            eventDispatcher.OnRemoveComponent(entityId, ref component);
+            if (Bufferable)
+            {
+                ref var buffer = ref chunk.GetComponent<ComponentBuffer<T>>(listOffset, listIndex, Stride);
+                eventDispatcher.OnAddComponent(entityId, ref buffer);
+            }
+            else
+            {
+                ref var component = ref Empty;
+                if (!ZeroSize) component = ref chunk.GetComponent<T>(listOffset, listIndex, Stride);
+                eventDispatcher.OnAddComponent(entityId, ref component);
+            }
         }
 
         public override unsafe void SetComponent(void* destination, object component)

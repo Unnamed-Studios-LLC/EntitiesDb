@@ -43,6 +43,13 @@ namespace EntitiesDb
         public bool ReadOnly => _enumerators != 0 || _inEvent;
 
         /// <summary>
+        /// Returns in the given type T is a bufferable component
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public static bool IsBufferable<T>() where T : unmanaged => ComponentMetaData<T>.Instance.Bufferable;
+
+        /// <summary>
         /// Adds or replaces a component buffer
         /// </summary>
         /// <typeparam name="T">The component type</typeparam>
@@ -177,8 +184,37 @@ namespace EntitiesDb
         /// <typeparam name="T">Component type</typeparam>
         /// <param name="eventAction">Event trigger</param>
         /// <param name="handler">Component handler</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="BufferableException"></exception>
         public void AddEvent<T>(Event eventAction, ComponentHandler<T> handler) where T : unmanaged
         {
+            if (handler is null)
+            {
+                throw new ArgumentNullException(nameof(handler));
+            }
+
+            var metaData = ComponentMetaData<T>.Instance;
+            if (metaData.Bufferable) throw new BufferableException(typeof(T));
+            _eventDispatcher.AddComponentEvent(eventAction, handler);
+        }
+
+        /// <summary>
+        /// Adds a component buffer event handler for a given Event
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="eventAction">Event trigger</param>
+        /// <param name="handler">Component handler</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="InvalidBufferableException"></exception>
+        public void AddEvent<T>(Event eventAction, ComponentHandler<ComponentBuffer<T>> handler) where T : unmanaged
+        {
+            if (handler is null)
+            {
+                throw new ArgumentNullException(nameof(handler));
+            }
+
+            var metaData = ComponentMetaData<T>.Instance;
+            if (!metaData.Bufferable) throw new InvalidBufferableException(typeof(T));
             _eventDispatcher.AddComponentEvent(eventAction, handler);
         }
 
@@ -187,6 +223,7 @@ namespace EntitiesDb
         /// </summary>
         /// <param name="eventAction">Event trigger</param>
         /// <param name="handler">Entity handler</param>
+        /// <exception cref="ArgumentNullException"></exception>
         public void AddEvent(Event eventAction, EntityHandler handler)
         {
             if (handler is null)
@@ -596,37 +633,6 @@ namespace EntitiesDb
         }
 
         /// <summary>
-        /// Returns an object containing the component value for an entity.
-        /// </summary>
-        /// <param name="entityId">Id of the entity</param>
-        /// <param name="componentType">Type of the component</param>
-        /// <returns>Component value for the given entity.</returns>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="EntityNotFoundException"></exception>
-        /// <exception cref="ComponentNotFoundException"></exception>
-        public object GetComponent(uint entityId, Type componentType)
-        {
-            if (componentType is null)
-            {
-                throw new ArgumentNullException(nameof(componentType));
-            }
-
-            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
-            {
-                throw new EntityNotFoundException(entityId);
-            }
-
-            if (!entityReference.Archetype.TryGetListOffset(componentType, out var listOffset))
-            {
-                throw new ComponentNotFoundException(entityId, componentType);
-            }
-
-            var metaData = ComponentMetaData.All[componentType];
-            var chunk = entityReference.GetChunk();
-            return metaData.GetComponent(chunk, listOffset, entityReference.Indices.ListIndex);
-        }
-
-        /// <summary>
         /// Gets the types of the components for an entity
         /// </summary>
         /// <param name="entityId">Id of the entity</param>
@@ -642,6 +648,10 @@ namespace EntitiesDb
             return entityReference.Archetype.Types;
         }
 
+        /// <summary>
+        /// Returns a unique <see cref="QueryFilter"/>
+        /// </summary>
+        /// <returns></returns>
         public QueryFilter GetQueryFilter()
         {
             var queryFilter = RentQueryFilter();
@@ -663,6 +673,7 @@ namespace EntitiesDb
         /// <param name="entityId">Id of the entity</param>
         /// <param name="componentType">The type to check</param>
         /// <returns>If the entity has the given component type</returns>
+        /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="EntityNotFoundException"></exception>
         public bool HasBuffer(uint entityId, Type componentType) => HasComponent(entityId, componentType);
 
@@ -709,7 +720,16 @@ namespace EntitiesDb
         /// Registers a component type, can be used to ensure deterministic component ordering
         /// </summary>
         /// <param name="componentType">Component type</param>
-        public void RegisterType(Type componentType) => GetTypeId(componentType);
+        /// <exception cref="ArgumentNullException"></exception>
+        public void RegisterType(Type componentType)
+        {
+            if (componentType is null)
+            {
+                throw new ArgumentNullException(nameof(componentType));
+            }
+
+            GetTypeId(componentType);
+        }
 
         /// <summary>
         /// Removes a component buffer for a given entity if the entity contains the component
@@ -800,8 +820,37 @@ namespace EntitiesDb
         /// <typeparam name="T">Component type</typeparam>
         /// <param name="eventAction">Event trigger</param>
         /// <param name="handler">Component handler</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="BufferableException"></exception>
         public void RemoveEvent<T>(Event eventAction, ComponentHandler<T> handler) where T : unmanaged
         {
+            if (handler is null)
+            {
+                throw new ArgumentNullException(nameof(handler));
+            }
+
+            var metaData = ComponentMetaData<T>.Instance;
+            if (!metaData.Bufferable) throw new BufferableException(typeof(T));
+            _eventDispatcher.RemoveComponentEvent(eventAction, handler);
+        }
+
+        /// <summary>
+        /// Removes a component buffer event handler for a given event
+        /// </summary>
+        /// <typeparam name="T">Component type</typeparam>
+        /// <param name="eventAction">Event trigger</param>
+        /// <param name="handler">Component handler</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="InvalidBufferableException"></exception>
+        public void RemoveEvent<T>(Event eventAction, ComponentHandler<ComponentBuffer<T>> handler) where T : unmanaged
+        {
+            if (handler is null)
+            {
+                throw new ArgumentNullException(nameof(handler));
+            }
+
+            var metaData = ComponentMetaData<T>.Instance;
+            if (!metaData.Bufferable) throw new InvalidBufferableException(typeof(T));
             _eventDispatcher.RemoveComponentEvent(eventAction, handler);
         }
 
@@ -810,6 +859,7 @@ namespace EntitiesDb
         /// </summary>
         /// <param name="eventAction">Event trigger</param>
         /// <param name="handler">Entity handler</param>
+        /// <exception cref="ArgumentNullException"></exception>
         public void RemoveEvent(Event eventAction, EntityHandler handler)
         {
             if (handler is null)
@@ -826,43 +876,6 @@ namespace EntitiesDb
                     _eventDispatcher.OnRemove -= handler;
                     break;
             }
-        }
-
-        /// <summary>
-        /// Set the component value for an entity.
-        /// </summary>
-        /// <param name="entityId">Id of the entity</param>
-        /// <param name="componentType">Type of the component</param>
-        /// <param name="componente">Component value of given component type</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="EntityNotFoundException"></exception>
-        /// <exception cref="ComponentNotFoundException"></exception>
-        /// <exception cref="InstanceTypeException"></exception>
-        public void SetComponent(uint entityId, Type componentType, object component)
-        {
-            if (componentType is null)
-            {
-                throw new ArgumentNullException(nameof(componentType));
-            }
-
-            if (!_entityReferences.TryGetValue(entityId, out var entityReference))
-            {
-                throw new EntityNotFoundException(entityId);
-            }
-
-            if (!entityReference.Archetype.TryGetListOffset(componentType, out var listOffset))
-            {
-                throw new ComponentNotFoundException(entityId, componentType);
-            }
-
-            var metaData = ComponentMetaData.All[componentType];
-            if (!metaData.IsInstanceOfType(component))
-            {
-                throw new InstanceTypeException(componentType, component);
-            }
-
-            var chunk = entityReference.GetChunk();
-            metaData.SetComponent(chunk, listOffset, entityReference.Indices.ListIndex, component);
         }
 
         /// <summary>

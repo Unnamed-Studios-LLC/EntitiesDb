@@ -111,7 +111,8 @@ namespace EntitiesDb
             }
 
             // increment and set item
-            ((T*)Data)[_size++] = item;
+            _size++;
+            ((T*)Data)[_size - 1] = item;
         }
 
         /// <summary>
@@ -158,7 +159,9 @@ namespace EntitiesDb
             if (index < 0 || index >= _size) throw new ArgumentOutOfRangeException(nameof(index));
 
             // decrement and swap back
-            if (index != --_size) ((T*)Data)[index] = ((T*)Data)[_size];
+            var nextSize = _size - 1;
+            if (index != nextSize) ((T*)Data)[index] = ((T*)Data)[nextSize];
+            _size = nextSize;
 
             // only check for resize on significant size values
             if (_size < _internalCapacity ||

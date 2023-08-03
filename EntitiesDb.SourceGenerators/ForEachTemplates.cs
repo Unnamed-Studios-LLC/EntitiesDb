@@ -28,36 +28,43 @@ internal static class ForEachTemplates
         var assertions = GetAssertions(stringBuilder, funcParameter, stateParameter);
 
         var source = $@"
-namespace EntitiesDb
+using EntitiesDb;
+
+internal static class {uniqueName}Extension
 {{
-    public static class {uniqueName}Extension
+    public static void {method.Name}(this {extensionParameter}, {parameters})
     {{
-        public static void {method.Name}(this {extensionParameter}, {parameters})
-        {{
-            {(inQueryFilter ? string.Empty : $"var queryFilter = {extensionArgument}.GetQueryFilter();")}
-{assertions}
-            var query = new {queryName}({queryArguments});
-            queryFilter.Query(query);
-        }}
+{(inQueryFilter ? string.Empty : $"        var queryFilter = {extensionArgument}.GetQueryFilter();\n")}{assertions}
+        var query = new {queryName}({queryArguments});
+        queryFilter.Query(query);
+    }}
         
-        private struct {queryName} : IQueryEnumerator
-        {{
+    private struct {queryName} : IQueryEnumerator
+    {{
 {fields}
 
-            public {queryName}({parameters})
-            {{
+        public {queryName}({parameters})
+        {{
 {fieldSetters}
-            }}
+        }}
         
-            public void EnumerateChunk(in EnumerationJob job)
-            {{
+        public void EnumerateChunk(in EnumerationJob job)
+        {{
 {enumeration}
-            }}
         }}
     }}
 }}
 ";
         return source;
+    }
+
+    private static void AssertTypeScope(ITypeSymbol type)
+    {
+        if (type.DeclaredAccessibility != Accessibility.Public &&
+            type.DeclaredAccessibility != Accessibility.Internal)
+        {
+            throw new Exception("Only Public and Internal class may be used in queries.");
+        }
     }
 
     private static string GetAssertions(StringBuilder stringBuilder, IParameterSymbol funcParameter, IParameterSymbol? stateParameter)
@@ -70,8 +77,8 @@ namespace EntitiesDb
             var parameterType = componentParameter.Type as INamedTypeSymbol ?? throw new Exception();
             var isBuffer = IsComponentBufferType(parameterType);
             var componentType = isBuffer ? parameterType.TypeArguments[0] : componentParameter.Type;
-            stringBuilder.AppendLine($"            QueryFilter.AssertDelegateComponent<{componentType}>({GetTrueFalse(isBuffer)});");
-            stringBuilder.AppendLine($"            queryFilter.WithTypes.Add(typeof({componentType}));");
+            stringBuilder.AppendLine($"        QueryFilter.AssertDelegateComponent<{componentType}>({GetTrueFalse(isBuffer)});");
+            stringBuilder.AppendLine($"        queryFilter.WithTypes.Add(typeof({componentType}));");
         }
         return stringBuilder.ToString();
     }
@@ -104,7 +111,7 @@ namespace EntitiesDb
         int indexToLower;
         if (stateParameter != null)
         {
-            stringBuilder.Append("            private ");
+            stringBuilder.Append("        private ");
             stringBuilder.Append(stateParameter.Type);
             stringBuilder.Append(" _");
             stringBuilder.Append(stateParameter.Name);
@@ -114,7 +121,7 @@ namespace EntitiesDb
             stringBuilder.Append(';');
             stringBuilder.Append(Environment.NewLine);
         }
-        stringBuilder.Append("            private readonly ");
+        stringBuilder.Append("        private readonly ");
         stringBuilder.Append(funcParameter.Type);
         stringBuilder.Append(" _");
         stringBuilder.Append(funcParameter.Name);
@@ -131,7 +138,7 @@ namespace EntitiesDb
         int indexToLower;
         if (stateParameter != null)
         {
-            stringBuilder.Append("                _");
+            stringBuilder.Append("            _");
             stringBuilder.Append(stateParameter.Name);
             indexToLower = stringBuilder.Length - stateParameter.Name.Length;
             stringBuilder[indexToLower] = char.ToLower(stringBuilder[indexToLower]);
@@ -144,7 +151,7 @@ namespace EntitiesDb
             stringBuilder.Append(Environment.NewLine);
         }
 
-        stringBuilder.Append("                _");
+        stringBuilder.Append("            _");
         stringBuilder.Append(funcParameter.Name);
         indexToLower = stringBuilder.Length - funcParameter.Name.Length;
         stringBuilder[indexToLower] = char.ToLower(stringBuilder[indexToLower]);
@@ -178,51 +185,51 @@ namespace EntitiesDb
         ParseDelegateParameters(funcParameter, out var hasEntityId, out var hasState, out var componentParameters);
 
         stringBuilder.Clear();
-        if (hasEntityId) stringBuilder.AppendLine("                var entityHandle = job.GetEntityIdHandle();");
+        if (hasEntityId) stringBuilder.AppendLine("            var entityHandle = job.GetEntityIdHandle();");
         int index = 0;
         foreach (var componentParameter in componentParameters)
         {
             var parameterType = componentParameter.Type as INamedTypeSymbol ?? throw new Exception();
             var isBuffer = IsComponentBufferType(parameterType);
             var componentType = isBuffer ? parameterType.TypeArguments[0] : componentParameter.Type;
-            if (isBuffer) stringBuilder.AppendLine($"                var componentHandle{++index} = job.GetComponentBufferHandle<{componentType}>();");
-            else stringBuilder.AppendLine($"                var componentHandle{++index} = job.GetComponentHandle<{componentType}>();");
+            if (isBuffer) stringBuilder.AppendLine($"            var componentHandle{++index} = job.GetComponentBufferHandle<{componentType}>();");
+            else stringBuilder.AppendLine($"            var componentHandle{++index} = job.GetComponentHandle<{componentType}>();");
         }
 
-        stringBuilder.AppendLine("                for (int i = 0; i < job.Length; i++)");
-        stringBuilder.AppendLine("                {");
+        stringBuilder.AppendLine("            for (int i = 0; i < job.Length; i++)");
+        stringBuilder.AppendLine("            {");
 
         // invoke func
-        stringBuilder.Append("                    _func(");
+        stringBuilder.Append("                _func(");
         if (hasEntityId)
         {
             stringBuilder.Append(Environment.NewLine);
-            stringBuilder.Append("                        entityHandle.Value");
+            stringBuilder.Append("                    entityHandle.Value");
         }
         index = 0;
         foreach (var componentParameter in componentParameters)
         {
             if (index != 0 || hasEntityId) stringBuilder.Append(',');
             stringBuilder.Append(Environment.NewLine);
-            stringBuilder.Append($"                        ref componentHandle{++index}.AsRef()");
+            stringBuilder.Append($"                    ref componentHandle{++index}.AsRef()");
         }
         if (hasState)
         {
             stringBuilder.Append(',');
             stringBuilder.Append(Environment.NewLine);
-            stringBuilder.Append("                        ref _state");
+            stringBuilder.Append("                    ref _state");
         }
         stringBuilder.Append(Environment.NewLine);
-        stringBuilder.AppendLine("                    );");
+        stringBuilder.AppendLine("                );");
 
         // move next
-        if (hasEntityId) stringBuilder.AppendLine("                    entityHandle.Next();");
+        if (hasEntityId) stringBuilder.AppendLine("                entityHandle.Next();");
         index = 0;
         foreach (var componentParameter in componentParameters)
         {
-            stringBuilder.AppendLine($"                    componentHandle{++index}.Next();");
+            stringBuilder.AppendLine($"                componentHandle{++index}.Next();");
         }
-        stringBuilder.Append("                }");
+        stringBuilder.Append("            }");
 
         return stringBuilder.ToString();
     }
@@ -295,8 +302,11 @@ namespace EntitiesDb
         hasState = lastParameter.Name.Equals("state");
 
         componentParameters = delegateMethod.Parameters.AsSpan();
+        foreach (var component in componentParameters) AssertTypeScope(component.Type);
+
         if (hasEntityId) componentParameters = componentParameters.Slice(1);
         if (hasState) componentParameters = componentParameters.Slice(0, componentParameters.Length - 1);
+
     }
 
     private static void ParseParameters(IMethodSymbol method, out ITypeSymbol queryableType, out IParameterSymbol funcParameter, out IParameterSymbol? stateParameter)

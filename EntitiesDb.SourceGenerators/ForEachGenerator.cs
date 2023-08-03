@@ -32,11 +32,17 @@ internal sealed class ForEachGenerator : IIncrementalGenerator
         foreach (var method in uniqueMethods)
         {
             if (context.CancellationToken.IsCancellationRequested) return;
-            var source = ForEachTemplates.Create(method, stringBuilder, out var uniqueName);
-            if (context.CancellationToken.IsCancellationRequested) return;
-
-            var fileName = $"{uniqueName}.g";
-            context.AddSource(fileName, source);
+            try
+            {
+                var source = ForEachTemplates.Create(method, stringBuilder, out var uniqueName);
+                if (context.CancellationToken.IsCancellationRequested) return;
+                var fileName = $"{uniqueName}.g";
+                context.AddSource(fileName, source);
+            }
+            catch
+            {
+                continue;
+            }
         }
     }
 

@@ -49,14 +49,22 @@ public class BufferTest
     [Benchmark]
     public void Test()
     {
-        var state = 5;
-        _entities?.GetQueryFilter().ForEach(state, static (uint entityId, ref Component component, ref ComponentBuffer<BufferedComponent> bufferedComponents, ref int state) =>
+        _entities?.GetQueryFilter().ForEach(_entities!, static (uint entityId, ref Component component, ref ComponentBuffer<BufferedComponent> bufferedComponents, ref EntityDatabase entities) =>
         {
             var bufferSpan = bufferedComponents.GetSpan();
             foreach (ref var bufferComponent in bufferSpan)
             {
 
             }
+
+            entities.GetQueryFilter().ForEach(static (uint entityId, ref Component component, ref ComponentBuffer<BufferedComponent> bufferedComponents) =>
+            {
+                var bufferSpan = bufferedComponents.GetSpan();
+                foreach (ref var bufferComponent in bufferSpan)
+                {
+
+                }
+            });
         });
     }
 }
